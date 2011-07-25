@@ -179,6 +179,7 @@ public:
         return setCapacity(newsize);
     }
     
+
     inline int get_capacity() const
     {
         return capacity;

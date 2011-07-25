@@ -9,8 +9,7 @@
 
 namespace spidir {
 
-//void removeWGDnodes(Tree *tree);
 SpeciesTree  *removeWGDnodes(SpeciesTree *tree);
- SpidirParams *paramforWGD(SpidirParams *params, SpeciesTree *tree);
+void extendRateParamToWGDnodes(SpidirParams *params, SpeciesTree *WGDstree);
 
 }

@@ -56,6 +56,29 @@ public:
     // sorts the parameters to match newnames
     virtual bool order(SpeciesTree *tree);    
 
+
+    //this function does not extend the names
+    //extends memory for spalpha and spbeta
+    void extendSp_alphaSp_beta(int newnsnodes)
+    {
+    
+      float *new_sp_alpha = new float [newnsnodes];
+      float *new_sp_beta = new float [newnsnodes];
+
+      for (int i=0; i<nsnodes; i++) {           
+	new_sp_alpha[i]=sp_alpha[i];
+	new_sp_beta[i]=sp_beta[i];
+      }
+      delete [] sp_alpha;
+      delete [] sp_beta;
+
+      sp_alpha = new_sp_alpha;
+      sp_beta = new_sp_beta;
+
+    }
+
+
+
     int nsnodes;
     string *names;
     float *sp_alpha;

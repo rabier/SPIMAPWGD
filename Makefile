@@ -12,6 +12,10 @@ prefix = /usr
 
 # C++ compiler options
 CXX = g++
+#CXX = /s/gcc-4.6.1/bin/g++
+# compiler above: problem later:
+# "/usr/lib64/libstdc++.so.6: version `GLIBCXX_3.4.15' not found"
+# problem with various gcc compilers: long list of errors at the end of compiling.
 
 CFLAGS := $(CFLAGS) \
     -Wall -fPIC \
@@ -87,8 +91,8 @@ SPIDIR_SRC = \
     src/top_prior.cpp \
     src/top_prior_extra.cpp \
     src/Tree.cpp \
-    src/treevis.cpp
-
+    src/treevis.cpp \
+    src/WGD.cpp
 
 SPIDIR_OBJS = $(SPIDIR_SRC:.cpp=.o)
 

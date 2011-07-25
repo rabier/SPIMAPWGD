@@ -556,5 +556,70 @@ bool Gene2species::getMap(string *genes, int ngenes,
 }
 
 
+// return a copy of the species tree
+// does not copy the WGD parameters, 
+// does not copy the preorder indices.
+SpeciesTree *SpeciesTree::copy()
+{
+    SpeciesTree *tree2 = new SpeciesTree(nnodes);
+    Node **nodes2 = tree2->nodes;
+    
+    for (int i=0; i<nnodes; i++) {
+        nodes2[i]->setChildren(nodes[i]->nchildren);
+        nodes2[i]->name = i;
+        nodes2[i]->dist = nodes[i]->dist;
+        nodes2[i]->longname = nodes[i]->longname;
+    }
+    
+    for (int i=0; i<nnodes; i++) {
+        for (int j=0; j<nodes[i]->nchildren; j++) {
+            Node *child = nodes[i]->children[j];
+            if (child)
+                nodes2[i]->children[j] = nodes2[child->name];
+            else
+                nodes2[i]->children[j] = NULL;
+        }
+        Node *parent = nodes[i]->parent;
+        if (parent)
+            nodes2[i]->parent = nodes2[parent->name];
+        else
+            nodes2[i]->parent = NULL;
+    }
+    
+    tree2->root = nodes2[root->name];
+    
+
+    for (int k=0;k<nWGD;k++){
+      tree2->settheWGD(k+1); 
+
+      WGDparam *WGDnew=new WGDparam(nodes2[theWGD[k]->WGD_before->name],
+				    nodes2[theWGD[k]->WGD_at->name],
+				    nodes2[theWGD[k]->WGD_after->name],
+				    theWGD[k]->lossProb,  
+				    theWGD[k]->totalDist);
+				
+
+      tree2->addWGD(WGDnew);
+      //     printf("\nvoila le premier nom associe %d\n", tree2->theWGD[k]->WGD_before->name);
+
+    }
+
+    //printf("olala");
+    //printf("nbre de WGD %d", nWGD);
+
+    //  for (int k=0;k<nWGD;k++){
+      
+    //  printf("\nvoila k  %d\n", k);
+    //  printf("\nvoila la Perte %f\n", tree2->theWGD[k]->lossProb);
+
+
+    //	     }
+//end try
+
+
+
+    return tree2;
+}
+
 
 } // namespace spidir

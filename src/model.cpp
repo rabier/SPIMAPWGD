@@ -23,7 +23,7 @@ namespace spidir {
 
 
 SpimapModel::SpimapModel(
-    int nnodes, SpeciesTree *stree, 
+    int nnodes, SpeciesTree *stree, SpeciesTree *stree_small,
     SpidirParams *params, 
     int *gene2species,
     float predupprob, float dupprob, float lossprob, 
@@ -32,6 +32,7 @@ SpimapModel::SpimapModel(
     Model(nnodes),
     nnodes(nnodes),
     stree(stree),
+    stree_noWGD(stree_small),
     params(params),
     gene2species(gene2species),
     predupprob(predupprob),
@@ -42,7 +43,7 @@ SpimapModel::SpimapModel(
     useBranchPrior(useBranchPrior)
 {
     doomtable = new double [stree->nnodes];
-    calcDoomTable(stree, dupprob, lossprob, doomtable);
+    calcDoomTable(stree, dupprob, lossprob, doomtable);    
 }
 
 

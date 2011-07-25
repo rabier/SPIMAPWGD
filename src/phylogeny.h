@@ -38,7 +38,7 @@ public:
         delete [] preorder;
     }
     
-    
+    SpeciesTree * copy();
     int setDepths(Node *node=NULL, int index=0)
     {        
         if (node == NULL)

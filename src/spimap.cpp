@@ -5,6 +5,9 @@
     Matt Rasmussen
     Copyright 2010-2011
 
+    modified for WGD by Charles-Elie Rabier
+    2011
+
 =============================================================================*/
 
 // c++ headers
@@ -34,7 +37,7 @@
 #include "seq_likelihood.h"
 #include "Sequences.h"
 #include "treevis.h"
-
+#include "WGD.h"
 
 #define VERSION_TEXT "1.2"
 #define VERSION_INFO  "\
@@ -43,6 +46,7 @@ SPecies Informed Max A Posteriori gene tree reconstruction \n\
 Matt Rasmussen 2010-2011\n\
 CSAIL, MIT \n\
 \n\
+Modified by Charles-Elie Rabier (2011) for Whole Genome Duplications\n\
 Citation:\n\
 A Bayesian Approach for Fast and Accurate Gene Tree Reconstruction.\n\
 Matthew D. Rasmussen and Manolis Kellis.\n\
@@ -379,17 +383,72 @@ int main(int argc, char **argv)
     srand(c.seed);
     printLog(LOG_LOW, "random seed: %d\n", c.seed);
     
-
+   
     
     //============================================================
     // read species tree
-    SpeciesTree stree;
-    if (!readNewickTree(c.streefile.c_str(), &stree)) {
+    SpeciesTree stree_noWGD;
+
+    if (!readNewickTree(c.streefile.c_str(), &stree_noWGD)) {
         printError("error reading species tree '%s'", c.streefile.c_str());
-        return 1;
+	return 1;
     }
-    stree.setDepths();
+
+   
+    printf("\nSpecies tree from input file, including WGD nodes:\n");
+    displayTree(&stree_noWGD, stdout, 0.2);
+
+    printf("\nInput species tree:\n");
+    writeNewickTree(stdout, &stree_noWGD,true);
+
+
+
+    // write WGD parameters
+    printf("\nWGD parameters, if any:\n");
+    for (int i=0; i<stree_noWGD.nWGD; i++) {
+       WGDparam * wgd = stree_noWGD.theWGD[i];
+       printf("WGD event number%d:\n", i);
+       printf("\tloss probability:  %f\n",wgd->lossProb);
+       printf("\tpercent distance:  %f\n",wgd->percentDist);
+       printf("\ttotal distance:    %f\n",wgd->totalDist);
+       printf("\tnode name at the end of 'before' period: %d\n",
+	      wgd->WGD_before->name);
+       printf("\tdistance 'before': %f\n", wgd->WGD_before->dist);
+       printf("\tnode name at the end of 'at' period:     %d\n",
+	      wgd->WGD_at->name);
+       printf("\tnode name at the end of 'after' period:  %d\n",
+	      wgd->WGD_after->name);
+       printf("\tdistance 'after':  %f\n", wgd->WGD_after->dist);
+    }
+
+
+  for (int i=0; i<stree_noWGD.nnodes; i++) {
+      Node *node = stree_noWGD.nodes[i];
+      printf("%d\t%s\n", node->name,(node->longname).c_str());
+      for (int i=0; i<node->nchildren; i++){
+	printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
+      }
+    }
     
+    SpeciesTree *WGDstree = removeWGDnodes(&stree_noWGD);
+
+
+    printf("\nWGD species tree:\n");
+    writeNewickTree(stdout, WGDstree,true);
+
+    printf("\nReduced species tree:\n");
+    writeNewickTree(stdout, &stree_noWGD,true);
+
+
+    displayTree(WGDstree, stdout, 0.2);
+
+    displayTree(&stree_noWGD, stdout,0.2);
+
+
+////////////////////////////////////////////
+
+
+    stree_noWGD.setDepths();
     
     // read sequences 
     Sequences *aln = readAlignFasta(c.alignfile.c_str());
@@ -403,13 +462,12 @@ int main(int argc, char **argv)
     if (aln->nseqs == 0) {
         printError("no sequences");
         return 1;
-    }
-    
+    }    
 
     // read SPIDIR parameters
     SpidirParams *params = NULL;
     if (c.paramsfile != "") {
-        params = readSpidirParams(c.paramsfile.c_str());
+      params = readSpidirParams(c.paramsfile.c_str());
     } else {
         // use default params
         printLog(LOG_LOW, 
@@ -424,12 +482,14 @@ int main(int argc, char **argv)
     }
     
     // check params
-    if (!params->order(&stree)) {
+    if (!params->order(&stree_noWGD)) {
+      // Warning: branch 'names' in param file corresponds to branch 'names' in stree_noWGD
+      // only if the species tree files with/without WGD use the same left/right.
+      // fixit: Place a warning in manual later on.
         printError("parameters do not correspond to the given species tree");
         return 1;
-    }
-        
-    
+    }        
+   
     // determine background base frequency
     float bgfreq[4];
 
@@ -465,20 +525,24 @@ int main(int argc, char **argv)
     genes.extend(aln->names, aln->nseqs);    
     
     // get species names
-    ExtendArray<string> species(stree.nnodes);
-    stree.getNames(species);
+    ExtendArray<string> species(stree_noWGD.nnodes);
+    stree_noWGD.getNames(species);
     
     // make gene to species mapping
     int nnodes = aln->nseqs * 2 - 1;
+
     ExtendArray<int> gene2species(nnodes);
-    mapping.getMap(genes, aln->nseqs, species, stree.nnodes, gene2species);
+    mapping.getMap(genes, aln->nseqs, species, stree_noWGD.nnodes, gene2species);
     
     // get initial gene tree
     Tree *tree = getInitialTree(genes, aln->nseqs, aln->seqlen, aln->seqs,
-                                &stree, gene2species);
+                                &stree_noWGD, gene2species);
     auto_ptr<Tree> tree_ptr(tree);
 
-       
+    //fixit: print the tree to the screen
+    printf("\nInitial gene tree from Neighbor-joining:\n");
+    displayTree(tree);
+    //writeNewickTree(stdout, tree,true);     
 
     //========================================================
     // determine kappa
@@ -501,8 +565,14 @@ int main(int argc, char **argv)
     //=====================================================
     // init model
     Model *model;    
+    
+    if (WGDstree->nWGD > 0){
+      //we will have  some rates for WGD 
+      extendRateParamToWGDnodes(params,WGDstree);
+    } 
 
-    SpimapModel *m = new SpimapModel(nnodes, &stree, params, 
+
+    SpimapModel *m = new SpimapModel(nnodes, WGDstree, &stree_noWGD, params,
                                      gene2species,
                                      c.pretime, 
                                      c.duprate, 
@@ -510,15 +580,18 @@ int main(int argc, char **argv)
                                      c.priorSamples,
                                      !c.priorExact,
                                      true);
+    
     m->setLikelihoodFunc(new HkySeqLikelihood(
         aln->nseqs, aln->seqlen, aln->seqs, 
         bgfreq, c.kappa, c.lkiter, 
         c.minlen, c.maxlen));
+
+    return 0;
     
     model = m;
     auto_ptr<Model> model_ptr(model);
 
-    
+      
     //========================================================
     // initialize search
     
@@ -526,7 +599,7 @@ int main(int argc, char **argv)
     
     float sprrate = .5;
     DefaultSearch prop(c.niter, c.quickiter,
-                       &stree, gene2species,
+                       &stree_noWGD, gene2species,
                        c.duprate, c.lossrate,
                        sprrate);
     TopologyProposer *proposer = &prop.mix2;
@@ -547,19 +620,24 @@ int main(int argc, char **argv)
         proposer->setCorrect(&correctTree);
     }
     
+    printf("\nCorrect gene tree from -c file:\n");
+    //displayTree(&correctTree);
 
     //=======================================================
     // search
     time_t startTime = time(NULL);
+    // return 0; 
+    // here is when the first reconciliation happens
     Tree *toptree = search->search(tree, genes, 
                                    aln->nseqs, aln->seqlen, aln->seqs);
     auto_ptr<Tree> toptree_ptr(toptree);
-    
     if (c.bootiter > 1) {
 	if (!bootstrap(aln, genes, search, c.bootiter, c.outprefix))
 	    return 1;
     }
     
+
+
     //========================================================
     // output final tree
     
@@ -569,15 +647,14 @@ int main(int argc, char **argv)
     // output recon
     if (c.outputRecon) {
         setInternalNames(toptree);
-        setInternalNames(&stree);
-
+        setInternalNames(&stree_noWGD);
         ExtendArray<int> recon(toptree->nnodes);
         ExtendArray<int> events(toptree->nnodes);
-        reconcile(toptree, &stree, gene2species, recon);
+        reconcile(toptree, &stree_noWGD, gene2species, recon);
         labelEvents(toptree, recon, events);
 
         string outreconFilename = c.outprefix  + ".recon";
-        writeRecon(outreconFilename.c_str(), toptree, &stree, 
+        writeRecon(outreconFilename.c_str(), toptree, &stree_noWGD, 
                    recon, events);
     }
 

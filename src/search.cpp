@@ -822,8 +822,12 @@ Tree *searchClimb(int niter, int quickiter,
     // model
     const int maxiter = 2;
     int seqlen = strlen(seqs[0]);
-    SpimapModel model(nnodes, &stree, &params, gene2species,
+    //  SpimapModel model(nnodes, &stree, &params, gene2species,
+    //		      pretime_lambda, birth, death, nsamples, approx, false);
+    
+    SpimapModel model(nnodes, &stree, &stree, &params, gene2species,
 		      pretime_lambda, birth, death, nsamples, approx, false);
+    
     model.setLikelihoodFunc(new HkySeqLikelihood(nseqs, seqlen, seqs, 
                                                  bgfreq, kappa, maxiter));
     // proposers

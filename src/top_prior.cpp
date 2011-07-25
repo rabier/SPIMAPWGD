@@ -111,9 +111,18 @@ double fullTreeCorrection(Tree *tree, Tree *stree, int *recon)
 }
 
 
+
+//function calcDoomTable
 // computes the entries of the doom probabilty table
 // uses analytic solution to infinite summation
-void calcDoomTable(Tree *tree, float birthRate, float deathRate, 
+
+//assumes that the speciestree after postorder, consider the WGD nodes
+//in the same order as when theWGD has been filled
+
+//for instance the first WGD_at node found in the speciestree after postorder,
+//must be the nodes corresponding to theWGD[0]->WGD_at 
+
+void calcDoomTable(Tree *WGDstree, float birthRate, float deathRate, 
                    double *doomtable)
 {
     const double l = birthRate;
@@ -121,43 +130,66 @@ void calcDoomTable(Tree *tree, float birthRate, float deathRate,
     const double r = l - u;
     const double lu = l / u;
     double p0, p1;
-
     // get nodes in post order
-    ExtendArray<Node*> nodes(0, tree->nnodes);
-    getTreePostOrder(tree, &nodes);    
+    ExtendArray<Node*> nodes(0, WGDstree->nnodes);
+    getTreePostOrder(WGDstree, &nodes);    
+  
 
+    int indWGD=0;
     
-    for (int i=0; i<tree->nnodes; i++) {
-        Node *node = nodes[i];
-        
-        if (node->isLeaf()) {
-            doomtable[node->name] = -INFINITY;
-        } else {          
-            double prod = 0.0;            
-            for (int j=0; j<node->nchildren; j++) {
-                Node *child = node->children[j];
-
-                // compute u_t and P(t(c))
-                const double t = child->dist;
-                const double dc = exp(doomtable[child->name]);
-
-                if (birthRate == deathRate) {
-                    const double lt = l * t;
-                    const double lt1 = 1.0 + lt;
-                    p0 = lt / lt1;
-                    p1 = 1.0 / lt1 / lt1;
-                } else {
-                    const double ert = exp(-r * t);
-                    const double luert = l - u*ert;
-                    p0 = (u - u * ert) / luert;
-                    p1 = r*r * ert / luert / luert;
-                }
-
-                prod += log(p0 + dc * p1 / (1.0 - lu * p0 * dc));
-            }
+    for (int i=0; i<WGDstree->nnodes; i++) {
+      Node *node = nodes[i];
+      
+      if (node->isLeaf()) {
+	doomtable[node->name] = -INFINITY;
+      } else {          
+	double prod = 0.0;            
+	for (int j=0; j<node->nchildren; j++) {
+	  Node *child = node->children[j];
+	  
+	  //try to add something for WGD
+	  if (child->longname == "WGD_at"){
 	    
-            doomtable[node->name] = prod;
-        }
+	    
+	    if (child->name != WGDstree->theWGD[indWGD]->WGD_at->name){
+	      
+	      printf("error for setting the parameters for the WGD");
+	      printf("the indices of the nodes of the tree and the indices of the nodes for the WGD don t match"); 
+	      printf("check how it has been filled");
+
+	      exit(1);
+	    }
+		  
+	    const double dc = exp(doomtable[child->name]);
+		  
+	    prod= log(dc)+log( (1-WGDstree->theWGD[indWGD]->lossProb)*dc + WGDstree->theWGD[indWGD]->lossProb);
+		
+	    indWGD++;
+
+	  }else{ 
+	    // compute u_t and P(t(c))
+	    const double t = child->dist;
+	    const double dc = exp(doomtable[child->name]);
+
+	    if (birthRate == deathRate) {
+	      const double lt = l * t;
+	      const double lt1 = 1.0 + lt;
+	      p0 = lt / lt1;
+	      p1 = 1.0 / lt1 / lt1;
+	    } else {
+	      const double ert = exp(-r * t);
+	      const double luert = l - u*ert;
+	      p0 = (u - u * ert) / luert;
+	      p1 = r*r * ert / luert / luert;
+	    }
+	    
+	    prod += log(p0 + dc * p1 / (1.0 - lu * p0 * dc));
+	  }
+	  
+	}
+	doomtable[node->name] = prod ;
+	
+      }
     }
 }
 

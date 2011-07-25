@@ -3,6 +3,9 @@
   Matt Rasmussen
   Copyright 2010-2011
   
+  modified by Charles-Elie Rabier for WGD
+  2011
+
   Tree datastructure
 
 =============================================================================*/
@@ -51,8 +54,8 @@ using namespace std;
 namespace spidir {
 
 
-// invariant: node->child->prev == last child of node
-// invariant: [last child of node].next == NULL
+  // invariant: node->child->prev == last child of node
+  // invariant: [last child of node].next == NULL
 
 
 // A node in the phylogenetic tree
@@ -67,7 +70,7 @@ public:
         //prev(NULL),
         children(NULL),
         nchildren(nchildren),
-        dist(0.0)
+	dist(0.0)
     {
         if (nchildren != 0)
             allocChildren(nchildren);
@@ -189,14 +192,63 @@ public:
 };
 
 
+//class describing a WGD
+class WGDparam
+{
+ public:
+
+ WGDparam() :
+    WGD_before(NULL),
+    WGD_at(NULL),
+    WGD_after(NULL),
+    lossProb(0),
+    totalDist(0), 
+    percentDist(0)
+ {}
+
+ WGDparam(Node* WGD_before, Node* WGD_at,Node* WGD_after,
+	  double p,double total) :
+      WGD_before(WGD_before),
+      WGD_at(WGD_at),
+      WGD_after(WGD_after),
+      lossProb(p),
+      totalDist(total)
+ {
+   percentDist = WGD_before->dist / total;
+ }
+
+  ~WGDparam() {}
+
+  //this function allow us to place the WGD at another location
+  void updatePercentDist(double xnew)
+    {
+      WGD_before->dist=totalDist*xnew;
+      WGD_after->dist=totalDist*(1-xnew);
+      percentDist=xnew;
+    }
+
+
+
+  Node *WGD_before;  // pointer to the node ending the edge before WGD
+  Node *WGD_at;       //  pointer to the node ending the WGD edge
+  Node *WGD_after;  // pointer to the node ending the edge after WGD
+  double lossProb;     //probability that the copy is lost
+  double totalDist; //total length of the branch where the WGD takes place 
+  //ie totalDist= WGD_before->dist +  WGD_after->dist
+  double percentDist; //percentage such as percentDist*totalDist=WGD_before->dist 
+  //percentDist allows to calibrate where the WGD takes place
+};
+
 // A phylogenetic tree
-class Tree
+ class Tree
 {
 public:
     Tree(int nnodes=0) :
-        nnodes(nnodes),
-        root(NULL),
-        nodes(nnodes, 100)
+  nnodes(nnodes),
+    root(NULL),
+	nodes(nnodes, 100),
+	theWGD(NULL),
+	nWGD(0)
     {
         for (int i=0; i<nnodes; i++)
             nodes[i] = new Node();
@@ -206,6 +258,8 @@ public:
     {
         for (int i=0; i<nnodes; i++)
             delete nodes[i];
+	if (theWGD)
+	  delete [] theWGD;
     }
     
     // Sets the branch lengths of the tree
@@ -300,12 +354,32 @@ public:
     // Returns whether the tree is self consistent
     bool assertTree();
         
+
+    void settheWGD(int _nWGD)
+    {
+        theWGD = resize(theWGD, nWGD, _nWGD);
+        nWGD = _nWGD;
+    }
+
+    void addWGD(WGDparam *WGDnew)
+    {
+      theWGD[nWGD-1]=WGDnew;
+    }
+
+
+
 public:    
     int nnodes;                 // number of nodes in tree
     Node *root;                 // root of the tree (NULL if no nodes)
     ExtendArray<Node*> nodes;   // array of nodes (size = nnodes)
+
+    WGDparam **theWGD;   // array of WGD pointers (size = nWGD)
+    int nWGD;      // number of WGD
+  
+
 };
                                
+
 
 // A hash function for a topology key to an integer
 struct HashTopology {

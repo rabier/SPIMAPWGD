@@ -88,7 +88,7 @@ public:
 class SpimapModel : public Model
 {
 public:
-    SpimapModel(int nnodes, SpeciesTree *stree, 
+    SpimapModel(int nnodes, SpeciesTree *stree, SpeciesTree *stree_small,
 		SpidirParams *params, 
 		int *gene2species,
 		float predupprob, float dupprob, float lossprob,
@@ -109,6 +109,7 @@ public:
 protected:
     int nnodes;
     SpeciesTree *stree;
+    SpeciesTree *stree_noWGD; // fixit remove if you don't want this
     SpidirParams *params;
     int *gene2species;
     float predupprob;

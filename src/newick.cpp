@@ -3,6 +3,10 @@
   Matt Rasmussen
   Copyright 2007-2011
 
+  modified for WGD by Charles-Elie Rabier
+  2011
+
+
   Newick tree reading/writing
 
 =============================================================================*/
@@ -85,70 +89,107 @@ int nodeNameCmp(const void *_a, const void *_b)
     }
 }
 
-
 Node *readNewickNode(FILE *infile, Tree *tree, Node *parent, int &depth)
 {
-    char chr, char1;
-    Node *node;
-    string token;
+  char  char1;
+  Node *node;
+  string token;
+  bool wgdtest = false;
+  // read first character
+  if (!(char1  = readChar(infile, depth))) {
+    printError("unexpected end of file");
+    return NULL;
+  }
+    
+    
+  if (char1 == '(') {
+    // read internal node
+    
+    int depth2 = depth;
+    node = tree->addNode(new Node());
+    if (parent)
+      parent->addChild(node);
+        
+    // read all child nodes at this depth
+    while (depth == depth2) {
+      Node *child = readNewickNode(infile, tree, node, depth);
+      if (!child)
+	return NULL;
+    }
+        
+    //read distance for this node
+    char chr = readUntil(infile, token, "):,;", depth);
 
-    // read first character
-    if (!(char1  = readChar(infile, depth))) {
-        printError("unexpected end of file");
-        return NULL;
+    if (chr==';'){
+      return node;}
+   
+    if (!(token.length()<3)){ 
+	  
+      if (token.substr(0,3)=="WGD"){//found a WGD
+	wgdtest=true;
+      }
     }
-    
-    
-    if (char1 == '(') {
-        // read internal node
-    
-        int depth2 = depth;
-        node = tree->addNode(new Node());
-        if (parent)
-            parent->addChild(node);
-        
-        // read all child nodes at this depth
-        while (depth == depth2) {
-            Node *child = readNewickNode(infile, tree, node, depth);
-            if (!child)
-                return NULL;
-        }
-        
-        // read distance for this node
-        char chr = readUntil(infile, token, "):,;", depth);
-        if (chr == ':') {
-            node->dist = readDist(infile, depth);
-            if (!(chr = readUntil(infile, token, "):,", depth)))
-                return NULL;
-        } else {
-            // node name, if it does not start with a number or ".","-"
-            if (!isdigit(chr) && chr != '.' && chr != '-') {
-                node->longname = char1 + trim(token.c_str());
-            }
-        }
-        
-        return node;
-    } else {
-        // read leaf
-        
-        node = tree->addNode(new Node());
-        if (parent)
-            parent->addChild(node);
-        
-        // read name
-        if (!(chr = readUntil(infile, token, ":),", depth)))
-            return NULL;
-        node->longname = char1 + trim(token.c_str());
-        
-        // read distance for this node
-        if (chr == ':') {
-            node->dist = readDist(infile, depth);
-            if (!(chr = readUntil(infile, token, ":),", depth)))
-                return NULL;
-        }
-        
-        return node;
+
+    if (!wgdtest){ //no whole genome duplication
+      node->longname = trim(token.c_str());
+      node->dist = readDist(infile, depth);
+      
+      if (!(chr = readUntil(infile, token, "):,;", depth))){
+	return NULL;}
+      
+    } 
+    else{ //whole genome duplication
+	  //we have to add a node
+      Node *node2;
+	 
+      node2 = tree->addNode(new Node());	  
+      node2->addChild(node);
+	 
+      // node was the child of parent created last
+      parent->children[parent->nchildren - 1] = node2;
+      node2->parent = parent;     
+      node2->dist = readDist(infile, depth);
+      node2->longname="WGD_before";      
+      node->longname="WGD_at";
+      node->dist=0;
+      
+      tree->settheWGD((tree->nWGD)+1);
+	  
+      //create a WGD to add to the tree
+      WGDparam *WGDnew=new WGDparam(node2,node,
+				    node->children[0],
+				    atof(token.substr(3,token.length()-3).c_str()), 
+				    node2->dist + node->children[0]->dist);
+      
+      tree->addWGD(WGDnew);
+      
+      if (!(chr = readUntil(infile, token, "):,", depth))){
+	return NULL;}
     }
+
+    return node;
+
+
+  } else {
+    // read leaf
+            
+    node = tree->addNode(new Node());
+    if (parent)
+      parent->addChild(node);
+        
+    char chr = readUntil(infile, token, "):,", depth);
+        
+    node->longname = char1 + trim(token.c_str());
+
+
+    if (chr == ':') {
+      node->dist = readDist(infile, depth);
+      if (!(chr = readUntil(infile, token, ":),", depth)))
+	return NULL;
+    }
+
+    return node;
+  }
 }
 
 
@@ -162,11 +203,13 @@ Tree *readNewickTree(FILE *infile, Tree *tree)
 
     int depth = 0;
     tree->root = readNewickNode(infile, tree, NULL, depth);
-    
+   
     // renumber nodes in a valid order
     // 1. leaves come first
     // 2. root is last
-    
+
+  
+
     if (tree->root != NULL) {
         tree->nodes[tree->root->name] = tree->nodes[tree->nnodes-1];    
         tree->nodes[tree->nnodes-1] = tree->root;
@@ -178,7 +221,7 @@ Tree *readNewickTree(FILE *infile, Tree *tree)
         
         // update names
         for (int i=0; i<tree->nnodes; i++)
-            tree->nodes[i]->name = i;
+	  tree->nodes[i]->name = i;
         
         return tree;
     } else {
