@@ -49,13 +49,9 @@ using namespace std;
 
 */
 
-
-
 namespace spidir {
-
-
-  // invariant: node->child->prev == last child of node
-  // invariant: [last child of node].next == NULL
+// invariant: node->child->prev == last child of node
+// invariant: [last child of node].next == NULL
 
 
 // A node in the phylogenetic tree
@@ -100,6 +96,9 @@ public:
         return nchildren == 0;
     }
     
+
+
+
     // Adds a node 'node' to be a child
     void addChild(Node *node)
     {
@@ -243,12 +242,13 @@ class WGDparam
  class Tree
 {
 public:
-    Tree(int nnodes=0) :
+ Tree(int nnodes=0) :
   nnodes(nnodes),
     root(NULL),
-	nodes(nnodes, 100),
-	theWGD(NULL),
-	nWGD(0)
+    nodes(nnodes, 100),
+    theWGD(NULL),
+    nWGD(0),
+    nleaves(0)
     {
         for (int i=0; i<nnodes; i++)
             nodes[i] = new Node();
@@ -309,6 +309,18 @@ public:
                 names[i] = nodes[i]->longname;
     }
         
+    //counts the number of leaves in the tree
+    void countleaves()
+    {
+      for (int i=0; i<nnodes; i++) {
+	if (nodes[i]->isLeaf()) {
+	 nleaves++; 
+	    }
+      }
+    }
+
+
+
     // Returns whether tree is rooted
     bool isRooted()
     {
@@ -375,7 +387,7 @@ public:
 
     WGDparam **theWGD;   // array of WGD pointers (size = nWGD)
     int nWGD;      // number of WGD
-  
+    int nleaves;   // number of leaves
 
 };
                                
