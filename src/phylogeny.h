@@ -24,6 +24,16 @@ enum {
     EVENT_DUP = 2
 };
 
+//best
+enum {
+    BEFORE = 0,
+    AT = 1,
+    AFTER = 2
+};
+
+
+
+
 class SpeciesTree : public Tree
 {
 public:

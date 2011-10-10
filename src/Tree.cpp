@@ -54,7 +54,6 @@ namespace spidir {
     tree2->root = nodes2[root->name];
     //copy the WGD parameters
    
-
     for (int k=0;k<nWGD;k++){
 
       tree2->settheWGD(k+1);	    
@@ -62,14 +61,11 @@ namespace spidir {
 				    nodes2[theWGD[k]->WGD_at->name],
 				    nodes2[theWGD[k]->WGD_after->name],
 				    theWGD[k]->lossProb,  
-				    theWGD[k]->totalDist);
-				
+				    theWGD[k]->totalDist);				
 
       tree2->addWGD(WGDnew);
 	    
-
     }
-
 
     return tree2;
   }
