@@ -50,7 +50,6 @@ int nodeNameCmpWGD(const void *_a, const void *_b)
 //first it gives the WGD nodes the largest node names
 //then it return the new WGD tree
 // and also the tree without WGD (modify argument tree)  
-
 //this way, the tree with WGD and without WGD have exactly the same node names for the 
 //non WGD nodes
 
@@ -125,7 +124,7 @@ SpeciesTree *removeWGDnodes(SpeciesTree *tree)
   return WGDtree;
 }
 
-  /////////////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////////////
 
 //function to prepare parameters for WGD
 //assumes that in the WGDtree, all the nodes WGD_before and WGD_at
@@ -152,6 +151,77 @@ void extendRateParamToWGDnodes(SpidirParams *params, SpeciesTree *WGDstree)
 	
       }
  
+}
+
+
+  //function which find the best location for a node, ie before at or after the WGD
+  //criteria : maximize the number of duplications which happened at the WGD
+int  WGDreconcile_onebranch(SpeciesTree *WGDstree,  int *recon_noWGD, int *events, Node *nodeWGDafter,Node *node,int *best)
+{
+  int dup_at; 
+
+  if ((recon_noWGD[node->name]!=nodeWGDafter->name) || (events[node->name]!=EVENT_DUP)){
+
+    // node is  a pseudoLeaf
+    best[node->name]=AFTER;
+    dup_at=0;
+    //losses_at=1;
+  }else
+    {//node is not a pseudoleaf
+      
+      int dup_at0;
+      int dup_at1;
+      dup_at0=WGDreconcile_onebranch(WGDstree, recon_noWGD, events, nodeWGDafter ,node->children[0],best);
+      
+      dup_at1=WGDreconcile_onebranch(WGDstree, recon_noWGD, events, nodeWGDafter ,node->children[1],best);
+      
+      if ((dup_at0+dup_at1)>1) {
+	  best[node->name]=BEFORE ;
+	  dup_at=dup_at0+dup_at1;
+	}else
+	{
+	  best[node->name]=AT ;
+	  dup_at=1;
+	}
+      
+    }
+
+return dup_at;
+
+}
+
+
+  //function which uses the information best (obtained with  WGDreconcile_onebranch), and changes recon based on  best
+  void WGDreconReset(SpeciesTree *WGDstree,  int *recon, int *recon_noWGD, int *events, Node *nodeWGDafter,Node *node,int *best)
+{
+  bool pseudoleaf;
+  pseudoleaf=0;
+
+  if ((recon_noWGD[node->name]!=nodeWGDafter->name) || (events[node->name]!=EVENT_DUP)){
+      pseudoleaf=1;
+    }
+
+  if (!pseudoleaf){
+
+    if (best[node->name]==AT){
+      //reconciliation with the node WGDat
+      recon[node->name]=nodeWGDafter->parent->name;
+      // events[node->name]= EVENT_DUP;
+    }
+
+    if (best[node->name]==BEFORE){ 
+
+      //reconciliation with the node WGDbefore
+      recon[node->name]=nodeWGDafter->parent->parent->name;
+      //events[node->name]= EVENT_DUP;
+      WGDreconReset(WGDstree, recon, recon_noWGD, events, nodeWGDafter, node->children[0], best);
+      WGDreconReset(WGDstree, recon, recon_noWGD, events, nodeWGDafter, node->children[1], best);
+      
+    }
+
+  }
+
+
 }
 
 
