@@ -16,6 +16,7 @@ namespace spidir {
 
 void performNni(Tree *tree, Node *nodea, Node *nodeb);
 void proposeRandomNni(Tree *tree, Node **a, Node **b);
+void performLocalChange(Tree *tree,float *mratio, float *mstarratio);
 void performSpr(Tree *tree, Node *subtree, Node *newpos);
 void proposeRandomSpr(Tree *tree, Node **subtree, Node **newpos);
 bool validSpr(Tree *tree, const Node *subtree, const Node *newpos);

@@ -58,6 +58,10 @@ void performNni(Tree *tree, Node *nodea, Node *nodeb)
 }
 
 
+
+
+
+
 void proposeRandomNni(Tree *tree, Node **a, Node **b)
 {
     // find edges for NNI
@@ -74,6 +78,270 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
                                          node2->children[0];
     assert((*a)->parent->parent == (*b)->parent);
 }
+
+
+
+//==========================================LOCAL CHANGE LARGET SIMON
+
+/*      noded
+          \
+         node2
+        /     \
+      nodec    node1
+               /  \
+         nodea     nodeb 
+
+*/
+
+
+
+
+//void performLocalChange(Tree *tree)
+  void performLocalChange(Tree *tree, float *mratio, float *mstarratio)
+{
+
+  printf("\n on arrive ds le localchange\n");
+  fflush(stdout);
+  
+  // find an  edge such as 
+  //the nodes must not be leaves
+  //but a node of the edge can be the root
+  int choice;
+  do {
+    choice = irand(tree->nnodes);
+  } while (tree->nodes[choice]->isLeaf() || 
+	   tree->nodes[choice]->parent == NULL) ;
+    
+  Node *node1 = tree->nodes[choice];
+  Node *node2 = tree->nodes[choice]->parent;    
+  Node  *nodec =(node2->children[0] == node1) ? node2->children[1] :
+    node2->children[0];
+  Node *noded=node2->parent;
+  Node *nodea = node1->children[irand(2)];
+  //chose randomly a children of node 1
+  //we call it nodea
+  //nodea will be a an extremity  for the local change algorithm
+
+  //nodeb is the other children
+  Node  *nodeb =(node1->children[0] == nodea) ? node1->children[1] :
+                                 node1->children[0];
+  float u1=frand();
+  //fix it later, find a value for lambda
+  float lambda=0.3;
+  //end fixit 
+  float u2=frand();
+  float x,y,xstar,ystar;
+
+  if (frand()<0.5){
+
+    //nodec is the other extremity for the local change        
+    printf("\n cas 1 nodec fixe\n");
+    float m = nodea->dist + node1->dist + nodec->dist;
+    //m is the distance nodea nodec
+    *mratio=m;
+
+
+    float mstar=m*exp(lambda*(u1-0.5));
+    *mstarratio=mstar;
+    x=nodea->dist;
+    y=nodea->dist+node1->dist;    
+
+    if (frand()<0.5){
+      // node2  does not move
+      //ie node1 moves
+      printf("\n cas 11\n");
+      printf("\n cas noded fixe 1\n");
+      xstar=u2*mstar;
+      ystar=y*mstar/m;
+      
+      if (xstar<ystar){
+	//topology does not change
+	printf("\n cas 111\n");
+	nodea->dist=xstar;
+	node1->dist=ystar-xstar;
+	nodec->dist=mstar-ystar;
+      }else{
+	//topology changes
+	printf("\n cas 112\n");
+	if (node1->children[0]==nodeb){
+	  node1->children[1]=nodec;
+	}else{
+	  node1->children[0]=nodec;
+	}
+
+	if (node2->children[0]==node1){
+	  node2->children[1]=nodea;
+	}else{
+	  node2->children[0]=nodea;
+	}
+
+	nodec->parent=node1; 
+	nodea->parent=node2;	
+	nodea->dist=ystar;
+	node1->dist=xstar-ystar;
+	nodec->dist=mstar-xstar;
+      }
+
+    }else{
+      //node1 does not move
+      //node2 moves
+      printf("\n cas 12\n");
+      printf("\n cas nodeb fixe\n");
+      ystar=u2*mstar;
+      xstar=x*mstar/m;
+	
+      if (xstar<ystar){
+	printf("\n cas 121\n");
+	//topology does not change
+	nodea->dist=xstar;
+	node1->dist=ystar-xstar;
+	nodec->dist=mstar-ystar;
+      }else{
+	//topology changes
+	printf("\n cas 122\n");
+	
+	if (node1->children[0]==nodeb){
+	  node1->children[1]=nodec;
+	}else{
+	  node1->children[0]=nodec;
+	}
+	
+	nodec->parent=node1;
+	
+	if (node2->children[0]==node1){
+	  node2->children[1]=nodea;
+	}else{
+	  node2->children[0]=nodea;
+	}
+
+	nodea->parent=node2;	
+	nodea->dist=ystar;
+	node1->dist=xstar-ystar;
+	nodec->dist=mstar-xstar;
+	
+      }
+    }
+    
+  }else{
+
+    //noded is the other extremity for the local change
+    printf("\ncase 2\n");
+    printf("\n cas 2\n");
+    float m = nodea->dist + node1->dist + node2->dist;
+    //m is the distance nodea noded
+    *mratio=m;
+    float mstar=m*exp(lambda*(u1-0.5));
+    *mstarratio=mstar;
+    x=nodea->dist;
+    y=nodea->dist+node1->dist;
+
+    if (frand()<0.5){
+      // node2  does not move
+      //ie node 1 moves      
+      printf("\n cas 21\n");
+      xstar=u2*mstar;
+      ystar=y*mstar/m;
+      
+      if (xstar<ystar){
+	printf("\n cas 211\n");
+	//topology does not change
+	nodea->dist=xstar;
+	node1->dist=ystar-xstar;
+	node2->dist=mstar-ystar;
+      }else{
+	//topology changes
+	printf("\n cas topochanges\n");
+	printf("\n cas 212\n");
+	fflush(stdout);
+
+	if (node2->children[0]==nodec){
+	  node2->children[1]=nodea;
+	}else{
+	  node2->children[0]=nodea;
+	} 
+
+	nodea->parent=node2;
+
+	if (node1->children[0]==nodeb){
+	  node1->children[1]=node2;
+	}else{
+	  node1->children[0]=node2;
+	} 
+
+	node2->parent=node1;
+	if (noded->children[0]==node2){
+	  noded->children[0]=node1;
+	}else{
+	  noded->children[1]=node1;
+	} 
+
+	node1->parent=noded;
+	nodea->dist=ystar;
+	node2->dist=xstar-ystar;
+	node1->dist=mstar-xstar;
+      }
+
+    }else{
+      //node1 does not move
+      //ie node 2 moves
+      printf("\n cas 22\n");
+      //node2 has to have a parent otherwise it is not possible
+      //so, in case node2 does not have any parent , we perform localchange again
+      printf("\n cas node1 bouge pas\n");
+      if (node2->parent==NULL){
+	//	performLocalChange(tree);
+	performLocalChange(tree,mratio,mstarratio);
+      }else{
+
+	printf("\n nod2parent\n");
+	ystar=u2*mstar;
+	xstar=x*mstar/m;
+	
+	if (xstar<ystar){
+	  printf("\n cas 221\n");
+	  //topology does not change
+	  nodea->dist=xstar;
+	  node1->dist=ystar-xstar;
+	  node2->dist=mstar-ystar;
+
+	}else{
+	  //topology changes
+	  printf("\n cas 222\n");
+	  printf("\n edberg\n");
+	  printf("\nvoicile nomdenoded %d\n",noded->name);
+	 
+	  if (node2->children[0]==nodec){
+	    node2->children[1]=nodea;
+	  }else{
+	    node2->children[0]=nodea;}
+	  
+	  if (node1->children[0]==nodeb){
+	    node1->children[1]=node2;
+	  }else{
+	    node1->children[0]=node2;}
+	  
+	  if (noded->children[0]==node2){
+	    noded->children[0]=node1;
+	  }else{
+	    noded->children[1]=node1;
+	  }
+
+	  nodea->parent=node2;
+	  node2->parent=node1;
+	  node1->parent=noded;
+	  nodea->dist=ystar;
+	  node2->dist=xstar-ystar;
+	  node1->dist=mstar-xstar;
+
+	}
+      }
+    }
+  }
+
+
+
+}
+
 
 
 //=============================================================================
