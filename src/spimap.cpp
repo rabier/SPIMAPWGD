@@ -1,6 +1,6 @@
 /*=============================================================================
 
-    SPIMAP - Speices Informed Max A Posteriori Phylogenetic Reconstruction
+    SPIMAP - Species Informed Max A Posteriori Phylogenetic Reconstruction
 
     Matt Rasmussen
     Copyright 2010-2011
@@ -94,11 +94,12 @@ public:
 		   ("-o", "--output", "<output filename prefix>", 
 		    &outprefix, "spimap",
 		    "prefix for all output filenames"));
-        config.add(new ConfigSwitch
+	config.add(new ConfigSwitch
 		   ("-r", "--recon", 
 		    &outputRecon,
 		    "Output reconciliation"));
     
+
         // sequence model
 	config.add(new ConfigParamComment("Sequence evolution model"));
 	config.add(new ConfigParam<float>
@@ -139,7 +140,14 @@ public:
 		   ("-b", "--boot", "<# bootstraps>", 
 		    &bootiter, 1,
 		    "number of bootstraps to perform (default: 1)"));
-        
+        config.add(new ConfigParam<int>
+		   ("-g", "--proposal-gene-topology", "<proposal type for gene tree topology>", 
+		    &propid, 1,
+		    "1 for spr-neighbor (default: 1), 0 for nni, 2 for localchange"));
+	 config.add(new ConfigParam<int>
+		    ("","--mcmc", "<mcmc>", 
+		    &method, 1,
+		    "1 for MCMC (default: 1) or 0 for MAP"));
     
         // misc
 	config.add(new ConfigParamComment("Miscellaneous", DEBUG_OPT));
@@ -189,6 +197,7 @@ public:
 	config.add(new ConfigParam<string>
 		   ("", "--log", "<log filename>", &logfile, "", 
 		    "log filename.  Use '-' to display on stdout."));
+
 	config.add(new ConfigSwitch
 		   ("-v", "--version", &version, "display version information"));
 	config.add(new ConfigSwitch
@@ -234,6 +243,47 @@ public:
 	return 0;
     }
 
+
+  void printarguments()
+  {
+
+    printLog(LOG_LOW, "SPIMAP executed with the following parameters\n");
+    printLog(LOG_LOW, "-propGT (0 for NNI and 1 for SPR) %d\n", propid);
+    printLog(LOG_LOW, "-a %s\n", alignfile.c_str());
+    printLog(LOG_LOW, "-S %s\n", smapfile.c_str());
+    printLog(LOG_LOW, "-s %s\n", streefile.c_str());
+    printLog(LOG_LOW, "-p %s\n", paramsfile.c_str());
+    printLog(LOG_LOW, "-o %s\n", outprefix.c_str());
+    printLog(LOG_LOW, "-r (1 true, 0 false) %d\n", outputRecon);
+    printLog(LOG_LOW, "-k  %f\n", kappa);
+    printLog(LOG_LOW, " -f %s\n", bgfreqstr.c_str());
+    printLog(LOG_LOW, "-duprate %f\n", duprate);
+    printLog(LOG_LOW, "-lossrate %f\n", lossrate);    
+    printLog(LOG_LOW, "-P %f\n", pretime);
+    printLog(LOG_LOW, "-niter %d\n", niter);
+    printLog(LOG_LOW, "-- quickiter %d\n", quickiter);
+    printLog(LOG_LOW, "-b %d\n", bootiter);
+    printLog(LOG_LOW, "-g (0 for NNI, 1 for SPR, 2 for LocalChange) %d\n", propid);
+    printLog(LOG_LOW, "--mcmc (1 for MCMC and 0 for ML) %d\n", method);
+    printLog(LOG_LOW, "-x %d\n", seed);
+    printLog(LOG_LOW, "comment %s\n", search.c_str());
+    printLog(LOG_LOW, "-c %s\n", correctFile.c_str());
+    printLog(LOG_LOW, "--prior %s\n", prioropt.c_str());
+    printLog(LOG_LOW, "--prior_samples %d\n", priorSamples);
+    printLog(LOG_LOW, "--prior_exact %d\n",  priorExact);
+    printLog(LOG_LOW, "--lkiter %d\n",  lkiter);
+    printLog(LOG_LOW, "--minlen %f\n", minlen);
+    printLog(LOG_LOW, "--maxlen %f\n", maxlen);
+    printLog(LOG_LOW, "-V %d\n", verbose);
+    printLog(LOG_LOW, "-v %d\n", version);
+    printLog(LOG_LOW, "-h %d\n", help);
+    printLog(LOG_LOW, "--help-debug %d\n", help_debug);
+    printLog(LOG_LOW, "--log %s\n", logfile.c_str());
+    printLog(LOG_LOW, "\n\n");
+  }
+  
+
+
     ConfigParser config;
 
     // input/output
@@ -257,6 +307,8 @@ public:
     int niter;
     int quickiter;
     int bootiter;
+    int propid;
+    int method;
 
     // misc
     int seed;
@@ -275,8 +327,7 @@ public:
     bool help;
     bool help_debug;
     string logfile;
-    
-
+ 
 };
 
 
@@ -377,14 +428,16 @@ int main(int argc, char **argv)
     }
  
     
+    c.printarguments();
+
     // seed random number generator
     if (c.seed == 0)
         c.seed = time(NULL);
     srand(c.seed);
     printLog(LOG_LOW, "random seed: %d\n", c.seed);
     
-   
-    
+
+
     //============================================================
     // read species tree
     SpeciesTree stree_noWGD;
@@ -402,11 +455,13 @@ int main(int argc, char **argv)
     writeNewickTree(stdout, &stree_noWGD,true);
 
 
+    SpeciesTree *WGDstree = removeWGDnodes(&stree_noWGD);
+
 
     // write WGD parameters
     printf("\nWGD parameters, if any:\n");
-    for (int i=0; i<stree_noWGD.nWGD; i++) {
-       WGDparam * wgd = stree_noWGD.theWGD[i];
+    for (int i=0; i<WGDstree->nWGD; i++) {
+       WGDparam * wgd = WGDstree->theWGD[i];
        printf("WGD event number%d:\n", i);
        printf("\tloss probability:  %f\n",wgd->lossProb);
        printf("\tpercent distance:  %f\n",wgd->percentDist);
@@ -421,20 +476,19 @@ int main(int argc, char **argv)
        printf("\tdistance 'after':  %f\n", wgd->WGD_after->dist);
     }
 
-
-  for (int i=0; i<stree_noWGD.nnodes; i++) {
-      Node *node = stree_noWGD.nodes[i];
+    printf("\nthe WGD species tree\n");
+    for (int i=0; i<WGDstree->nnodes; i++) {
+      Node *node = WGDstree->nodes[i];
       printf("%d\t%s\n", node->name,(node->longname).c_str());
       for (int i=0; i<node->nchildren; i++){
 	printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
       }
     }
     
-    SpeciesTree *WGDstree = removeWGDnodes(&stree_noWGD);
 
 
-    printf("\nWGD species tree:\n");
-    writeNewickTree(stdout, WGDstree,true);
+    printf("\nthe WGD species tree graphically:\n");
+     writeNewickTree(stdout, WGDstree,true);
 
     printf("\nReduced species tree:\n");
     writeNewickTree(stdout, &stree_noWGD,true);
@@ -529,18 +583,19 @@ int main(int argc, char **argv)
     stree_noWGD.getNames(species);
     
     // make gene to species mapping
-    int nnodes = aln->nseqs * 2 - 1;
+    int nnodes = aln->nseqs * 2 - 1; // number of nodes in the plain gene tree
 
-    ExtendArray<int> gene2species(nnodes);
+    ExtendArray<int> gene2species(nnodes); 
     mapping.getMap(genes, aln->nseqs, species, stree_noWGD.nnodes, gene2species);
     
-    // get initial gene tree
+    // get initial gene tree by neighbor joining
     Tree *tree = getInitialTree(genes, aln->nseqs, aln->seqlen, aln->seqs,
                                 &stree_noWGD, gene2species);
+   
     auto_ptr<Tree> tree_ptr(tree);
 
-    //fixit: print the tree to the screen
     printf("\nInitial gene tree from Neighbor-joining:\n");
+    fflush(stdout);  
     displayTree(tree);
     //writeNewickTree(stdout, tree,true);     
 
@@ -571,7 +626,8 @@ int main(int argc, char **argv)
       extendRateParamToWGDnodes(params,WGDstree);
     } 
 
-
+    printf("now creating SpimapModel");
+    fflush(stdout);
     SpimapModel *m = new SpimapModel(nnodes, WGDstree, &stree_noWGD, params,
                                      gene2species,
                                      c.pretime, 
@@ -580,32 +636,55 @@ int main(int argc, char **argv)
                                      c.priorSamples,
                                      !c.priorExact,
                                      true);
-    
-    m->setLikelihoodFunc(new HkySeqLikelihood(
+     printf("done\n");
+     printf("now printing species tree\n");
+     fflush(stdout);
+
+     for (int i=0; i<WGDstree->nnodes; i++) {
+       Node *node = WGDstree->nodes[i];
+       printf("%d\t%s\n", node->name,(node->longname).c_str());
+       for (int i=0; i<node->nchildren; i++){
+	 printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
+       }
+     }
+
+     fflush(stdout);
+
+     m->setLikelihoodFunc(new HkySeqLikelihood(
         aln->nseqs, aln->seqlen, aln->seqs, 
         bgfreq, c.kappa, c.lkiter, 
         c.minlen, c.maxlen));
 
-    return 0;
     
     model = m;
     auto_ptr<Model> model_ptr(model);
 
-      
+
     //========================================================
     // initialize search
     
     // init topology proposer
     
     float sprrate = .5;
+
+
+    printf("\nvoici lid du proposal%d\n",c.propid);
+    printf("\nvoici le nb diter%d\n",c.niter);
+    printf("\nvoici le taux de dup%f\n",c.duprate);
+    //fixit two trees with and without WGD
     DefaultSearch prop(c.niter, c.quickiter,
                        &stree_noWGD, gene2species,
                        c.duprate, c.lossrate,
-                       sprrate);
-    TopologyProposer *proposer = &prop.mix2;
+                       sprrate,c.propid);
+
+
+    MixProposer *proposer = &prop.mix;
+
 
     // init search
-    TreeSearch *search = new TreeSearchClimb(model, proposer);
+    TreeSearchClimb *search = new TreeSearchClimb(model, proposer);
+
+
     auto_ptr<TreeSearch> search_ptr(search);
 
     // load correct tree
@@ -622,48 +701,71 @@ int main(int argc, char **argv)
     
     printf("\nCorrect gene tree from -c file:\n");
     //displayTree(&correctTree);
-
     //=======================================================
     // search
     time_t startTime = time(NULL);
-    // return 0; 
     // here is when the first reconciliation happens
+    
     Tree *toptree = search->search(tree, genes, 
-                                   aln->nseqs, aln->seqlen, aln->seqs);
+                                   aln->nseqs, aln->seqlen, aln->seqs, c.outprefix, c.method);
+
     auto_ptr<Tree> toptree_ptr(toptree);
     if (c.bootiter > 1) {
 	if (!bootstrap(aln, genes, search, c.bootiter, c.outprefix))
 	    return 1;
     }
     
-
+    	printf("\non a fini les proposition\n");
+	fflush(stdout);
 
     //========================================================
     // output final tree
     
     if (isLogLevel(LOG_LOW))
         displayTree(toptree, getLogFile());
-    
+
     // output recon
     if (c.outputRecon) {
         setInternalNames(toptree);
-        setInternalNames(&stree_noWGD);
-        ExtendArray<int> recon(toptree->nnodes);
-        ExtendArray<int> events(toptree->nnodes);
-        reconcile(toptree, &stree_noWGD, gene2species, recon);
-        labelEvents(toptree, recon, events);
-
-        string outreconFilename = c.outprefix  + ".recon";
-        writeRecon(outreconFilename.c_str(), toptree, &stree_noWGD, 
-                   recon, events);
+        setInternalNames(WGDstree);
+	string outreconFilename = c.outprefix  + ".recon";	
+	  writeRecon(outreconFilename.c_str(), toptree, WGDstree, search->getmodel()->recon, search->getmodel()->events);
     }
+
+
 
     // output gene tree
     string outtreeFilename = c.outprefix  + ".tree";
     writeNewickTree(outtreeFilename.c_str(), toptree);
 
 
-    
+
+    /////
+    printf("now printing species tree\n");
+    displayTree(WGDstree, stdout, 0.2);
+     fflush(stdout);
+
+     for (int i=0; i<WGDstree->nnodes; i++) {
+       Node *node = WGDstree->nodes[i];
+       printf("%d\t%s\n", node->name,(node->longname).c_str());
+       for (int i=0; i<node->nchildren; i++){
+	 printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
+       }
+     }
+     /////////////////////////////
+  printf("now printing final gene tree\n");
+  displayTree(toptree, stdout,60,2);
+  
+for (int i=0; i<toptree->nnodes; i++) {
+       Node *node = toptree->nodes[i];
+       printf("%d\t%s\n", node->name,(node->longname).c_str());
+       for (int i=0; i<node->nchildren; i++){
+	 printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
+       }
+     }
+
+
+  
     // log tree correctness
     if (c.correctFile != "") {
         if (proposer->seenCorrect()) {
@@ -690,5 +792,8 @@ int main(int argc, char **argv)
     printLog(LOG_LOW, "runtime minutes:\t%.1f\n", float(runtime / 60.0));
     printLog(LOG_LOW, "runtime hours:\t%.1f\n", float(runtime / 3600.0));
     closeLogFile();
+   
+
+    return 5;
 }
 
