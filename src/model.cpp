@@ -22,6 +22,7 @@
 namespace spidir {
 
 
+
 SpimapModel::SpimapModel(
     int nnodes, SpeciesTree *stree, SpeciesTree *stree_small,
     SpidirParams *params, 
