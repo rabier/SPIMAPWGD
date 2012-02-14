@@ -57,8 +57,10 @@ class Model
 public:
     Model(int nnodes=0) :
         tree(NULL),
-        recon(nnodes),
+	recon(nnodes),
         events(nnodes),
+	recon_noWGD(nnodes),
+	best(nnodes),
         seq_runtime(0),
         branch_runtime(0),
         top_runtime(0)
@@ -77,6 +79,8 @@ public:
     Tree *tree;
     ExtendArray<int> recon;
     ExtendArray<int> events;
+    ExtendArray<int> recon_noWGD;
+    ExtendArray<int> best;
 
     // runtimes
     float seq_runtime;
@@ -93,10 +97,12 @@ public:
 		int *gene2species,
 		float predupprob, float dupprob, float lossprob,
 		int nsample, bool approx, bool useBranchPrior);
-
+    //stree_small speciestree without WGD
+    //stree speciestree with WGD
     virtual ~SpimapModel();
 
     virtual void setTree(Tree *_tree);
+    virtual void WGDreconcile(Node *node,int thelastWGD);
     virtual double likelihood();
     virtual double branchPrior();
     virtual double topologyPrior();
@@ -109,7 +115,7 @@ public:
 protected:
     int nnodes;
     SpeciesTree *stree;
-    SpeciesTree *stree_noWGD; // fixit remove if you don't want this
+    SpeciesTree *stree_noWGD;
     SpidirParams *params;
     int *gene2species;
     float predupprob;

@@ -17,7 +17,10 @@
 #include "common.h"
 #include "phylogeny.h"
 #include "Tree.h"
-
+// maybe remove treevis
+#include "treevis.h"
+//
+#include "top_prior_extra.h"
 
 
 namespace spidir
@@ -141,7 +144,10 @@ void calcDoomTable(Tree *WGDstree, float birthRate, float deathRate,
       Node *node = nodes[i];
       
       if (node->isLeaf()) {
+
 	doomtable[node->name] = -INFINITY;
+
+
       } else {          
 	double prod = 0.0;            
 	for (int j=0; j<node->nchildren; j++) {
@@ -156,7 +162,7 @@ void calcDoomTable(Tree *WGDstree, float birthRate, float deathRate,
 	      printf("error for setting the parameters for the WGD");
 	      printf("the indices of the nodes of the tree and the indices of the nodes for the WGD don t match"); 
 	      printf("check how it has been filled");
-
+	      fflush(stdout);
 	      exit(1);
 	    }
 		  
@@ -188,7 +194,7 @@ void calcDoomTable(Tree *WGDstree, float birthRate, float deathRate,
 	  
 	}
 	doomtable[node->name] = prod ;
-	
+
       }
     }
 }
@@ -215,7 +221,6 @@ void getSpecSubtree(Node *node, Node *snode, int *recon, int *events,
 }
 
 
-// TODO: does not handle branches above the species tree root yet
 // NOTE: assumes binary species tree
 double birthDeathTreePrior(Tree *tree, Tree *stree, int *recon, 
                            int *events, float birthRate, float deathRate,
@@ -300,31 +305,44 @@ double birthDeathTreePrior(Tree *tree, Tree *stree, int *recon,
 }
 
 
-// Convenience function
+ // Convenience function
 // Adds and removes implied species nodes to the gene tree
 // NOTE: assumes binary species tree
 double birthDeathTreePriorFull(Tree *tree, Tree *stree, int *recon, 
                                int *events, float birthRate, float deathRate,
                                double *doomtable)
 {
-    ExtendArray<int> recon2(0, 2 * tree->nnodes);
-    recon2.extend(recon, tree->nnodes);
+  // ExtendArray<int> recon2(0, 2 * tree->nnodes);
+  int upperbound;//upperbound for the number of nodes in the gene tree (included hidden nodes);
+  tree->countleaves();
+  stree->countleaves();
+  upperbound=(tree->nleaves)*(stree->nnodes-stree->nleaves);
+  ExtendArray<int> recon2(0,upperbound); 
+  recon2.extend(recon, tree->nnodes); 
+  ExtendArray<int> events2(0,upperbound);
+  events2.extend(events, tree->nnodes);
+	fflush(stdout);
 
-    ExtendArray<int> events2(0, 2 * tree->nnodes);
-    events2.extend(events, tree->nnodes);
+
+  //printf("gene tree without implied nodes\n");
+  // displayTree(tree, stdout, 0.2);
+
+   int addedNodes = addImpliedSpecNodes(tree, stree, recon2, events2);
+
+   double p = birthDeathTreePrior2(tree, stree, recon2, events2, 
+				  birthRate, deathRate,
+				  doomtable);
 
 
-    int addedNodes = addImpliedSpecNodes(tree, stree, recon2, events2);
-    double p = birthDeathTreePrior(tree, stree, recon2, events2, 
-                                   birthRate, deathRate,
-                                   doomtable);
-    removeImpliedSpecNodes(tree, addedNodes);
+   removeImpliedSpecNodes(tree, addedNodes);
 
-    return p;
+   return p;
 }
 
 
+
 }
+
 
 } // namespace spidir
 

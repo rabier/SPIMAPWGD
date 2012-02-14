@@ -9,6 +9,9 @@
 #include "phylogeny.h"
 #include "top_prior.h"
 #include "Tree.h"
+// maybe remove treevis
+#include "treevis.h"
+//
 
 
 
@@ -371,7 +374,7 @@ void getHashIds(Tree *tree, int *recon, int *hashids)
     // get post order of nodes
     ExtendArray<Node*> postnodes(0, tree->nnodes);
     getTreePostOrder(tree, &postnodes);    
-
+ 
     // build hash nodes
     for (int i=0; i<postnodes.size(); i++)
     {
@@ -452,92 +455,168 @@ void getHashIds(Tree *tree, int *recon, int *hashids)
 
 
 
+
 // TODO: does not handle branches above the species tree root yet
 // NOTE: assumes binary species tree
 double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon, 
                             int *events, float birthRate, float deathRate,
-                            double *doomtable, int maxdoom)
+                            double *doomtable)
 {
 
-    double prob = 0.0;
-    ExtendArray<Node*> subleaves(0, tree->nnodes);
-    
-    // catch undefined params
-    if (birthRate == deathRate)
-        deathRate = .99 * birthRate;
-    
-    ExtendArray<int> hashids(tree->nnodes);
-    getHashIds(tree, recon, hashids);
+  const double l = birthRate;
+  const double u = deathRate;
+  const double r = l - u;
+  const double lu = l / u;
+  double p0, p1;
+  double prob = 0.0;
+  ExtendArray<Node*> subleaves(0, tree->nnodes);   
+  ExtendArray<int> hashids(tree->nnodes);
+  getHashIds(tree, recon, hashids);
+  double nhist, thist;
 
-    // preroot duplications
-    //if (events[tree->root->name] == EVENT_DUP)
+  // preroot duplications
 
-    // loop through speciation nodes in tree
-    for (int i=0; i<tree->nnodes; i++) {
-        Node *node = tree->nodes[i];        
-        if (events[node->name] == EVENT_SPEC) {
+  if (events[tree->root->name] == EVENT_DUP){
+      subleaves.clear();
+      getSpecSubtree(tree->root, stree->nodes[recon[tree->root->name]], recon, events, subleaves);
+      
+      nhist = numSubtopologyHistories(tree, tree->root, subleaves);
+      thist = numHistories(subleaves.size());
+      printf("le nb de feuilles est %d\n",subleaves.size());
+      // correct subtrees 
+      nhist *= exp(numRedundantTopologies(tree, tree->root, 
+					  subleaves, 
+					  hashids,
+					  false));
+      
+      prob += log(nhist) - log(thist);
+      // prob -= log(100);
+      //improper prior on the number of subleaves at the root 
+  }
 
-            // loop through nodes u \in child(R(v))
-            Node *snode = stree->nodes[recon[node->name]];
-            for (int j=0; j<snode->nchildren; j++) {
-                Node *schild = snode->children[j];
+  // loop through speciation nodes in tree
+  for (int i=0; i<tree->nnodes; i++) {
+    Node *node = tree->nodes[i];        
+    if (events[node->name] == EVENT_SPEC) {
 
-                // get subtree that reconciles to snode
-                subleaves.clear();
-                getSpecSubtree(node, schild, recon, events, subleaves);
+      Node *snode = stree->nodes[recon[node->name]];
 
-		double nhist, thist;
+      //check if snode is a WGD_before node
+      //and keep the index of the WGD in the variable indWGD
+      bool isWGDbefore=0;
+      int indWGD=-1;
+     
+      for (int k=0; k<stree->nWGD; k++){
 
-		if (subleaves.size() == 0) {
-		    nhist = 1.0;
-		    thist = 1.0;
-		} else {
-		    nhist = numSubtopologyHistories(tree, node, subleaves);
-		    thist = numHistories(subleaves.size());		    
+	if (snode==stree->theWGD[k]->WGD_before) {
+	  isWGDbefore=1;
+	  indWGD=k;}
+      }
+      
+      if (isWGDbefore) {
+	//snode is a WGD_before node
+	Node *schild = snode->children[0];
+	
+	// get subtree that reconciles to schild
+	subleaves.clear();
+	getSpecSubtree(node, schild, recon, events, subleaves);
+	
+	const double dc = exp(doomtable[schild->name]);
+	const int s = subleaves.size();
+	
+	if (s==2){
+	  prob += log(1-stree->theWGD[indWGD]->lossProb);
+	}else{
+	  prob += log(stree->theWGD[indWGD]->lossProb+(1-stree->theWGD[indWGD]->lossProb)*dc);
+	}
+	//note no corrections factors needed for WGD
 
-		    if (subleaves[0]->isLeaf()) {
-                        // correct subtrees that have leaves
-			nhist *= exp(numRedundantTopologies(tree, node, 
-                                                            subleaves, 
-                                                            hashids,
-                                                            false));
-		    } else {
-                        // correct subtrees that have leaves
-			double a = exp(numRedundantTopologies(tree, node, 
-                                                              subleaves, 
-                                                              hashids,
-                                                              true));
-                        nhist *= a;
-                    }
-		}
+      }else{
+	//snode is not a WGD_before 
+	for (int j=0; j<snode->nchildren; j++) {
+	  Node *schild = snode->children[j];
+	  
+	  // get subtree that reconciles to schild
+	  subleaves.clear();
+	  getSpecSubtree(node, schild, recon, events, subleaves);
+
+	  if (subleaves.size() == 0) {
+	    nhist = 1.0;
+	    thist = 1.0;
+	  } else {
+	    nhist = numSubtopologyHistories(tree, node, subleaves);
+	    thist = numHistories(subleaves.size());		    
+
+	    if (subleaves[0]->isLeaf()) {
+	      // correct subtrees that have leaves
+	      nhist *= exp(numRedundantTopologies(tree, node, 
+						  subleaves, 
+						  hashids,
+						  true));
+	    } else {
+	      // correct subtrees that do not have leaves
+	      nhist *= exp(numRedundantTopologies(tree, node, 
+						    subleaves, 
+						    hashids,
+						    false));
+	    }
+	  }
 		
-                // sum over ndoom
-                double sum = 0.0;
-                for (int ndoom=0;  ndoom<=maxdoom; ndoom++) {
-                    int totleaves = subleaves.size() + ndoom;
-                    sum += fchoose(totleaves, ndoom) *
-                        birthDeathCount(totleaves, 
-                                        schild->dist,
-                                        birthRate, deathRate) *
-                        ipow(exp(doomtable[schild->name]), ndoom);
-                }
+	  prob += log(nhist) - log(thist);
 
-                prob += log(nhist) - log(thist) + log(sum);
-            }
-        }
-    }
+	  //now  compute the infinite sum for the doomed
+	  // compute u_t and P(t(c))
+	  const double t = schild->dist;
+	  const double dc = exp(doomtable[schild->name]);
+	  const int s = subleaves.size();
+	  
+	  if (birthRate == deathRate) {
+	    const double lt = l * t;
+	    const double lt1 = 1.0 + lt;
+	    p0 = lt / lt1;
+	    p1 = 1.0 / lt1 / lt1;
+	  } else {
+	    const double ert = exp(-r * t);
+	    const double luert = l - u*ert;
+	    p0 = (u - u * ert) / luert;
+	    p1 = r*r * ert / luert / luert;
+	  }
+	  
+	  if (s > 1) {
+	    prob += log(pow(lu * p0, s-1) * p1 / 
+			(pow(1.0 - lu * p0 * dc, s+1)));
+	  } else if (s == 1) {
+	    const double a = 1.0 - lu * p0 * dc;
+	    prob += log(p1 / a / a);
+	  } else { // s == 0
+	    prob += log(p0 + p1 * dc / (1.0 - lu * p0 *dc));
+	  }        
+	  
+	  
+	}
+	
+      }
 
-    ExtendArray<Node*> leaves(0, tree->nnodes);
-    for (int i=0; i<tree->nnodes; i++) {
-	if (tree->nodes[i]->isLeaf())
-	    leaves.append(tree->nodes[i]);
     }
-    double x = numRedundantTopologies(tree, tree->root, leaves, 
-                                      hashids, false);
-    prob -= x;
+  }
+
+
+  ///final correction for the whole tree
+
+  ExtendArray<Node*> leaves(0, tree->nnodes);
+  for (int i=0; i<tree->nnodes; i++) {
+    if (tree->nodes[i]->isLeaf())
+      leaves.append(tree->nodes[i]);
+  }
+  double x = numRedundantTopologies(tree, tree->root, leaves, 
+				    hashids, false);
+  prob -= x;
     
-    return prob;
-}
+  return prob;
+  }
+
+
+
 
 
 
