@@ -21,7 +21,6 @@
 #include "top_prior.h"
 #include "treevis.h"
 
-
 namespace spidir {
 
 //=============================================================================
@@ -70,6 +69,7 @@ bool TreeSet::has(Tree *tree)
 
 
 //=============================================================================
+
 // NNI Proposer
 
 NniProposer::NniProposer(int niter) :
@@ -83,7 +83,6 @@ void NniProposer::propose(Tree *tree)
 {
     // increase iteration
     iter++;
-    
     // propose new tree
     proposeRandomNni(tree, &nodea, &nodeb);
     performNni(tree, nodea, nodeb);
@@ -91,8 +90,11 @@ void NniProposer::propose(Tree *tree)
 
 void NniProposer::revert(Tree *tree)
 {
+  writeNewickTree(stdout, tree,true);
     // undo topology change
-    performNni(tree, nodea, nodeb);
+  performNni(tree, nodea, nodeb); 
+  writeNewickTree(stdout, tree,true);
+
 }
 
 
@@ -104,11 +106,13 @@ SprProposer::SprProposer(int niter) :
 {
 }
 
+
+
 void SprProposer::propose(Tree *tree)
 {   
     // increase iteration
     iter++;
-    
+ 
     // choose a SPR move
     proposeRandomSpr(tree, &nodea, &nodeb);
     
@@ -180,7 +184,6 @@ void SprNbrProposer::propose(Tree *tree)
     else
         assert(basetree == tree);
 
-
     // start a new subtree
     if (iter == 0 || queue.size() == 0 || !reverted) {
         iter = 0;
@@ -188,41 +191,169 @@ void SprNbrProposer::propose(Tree *tree)
     }
 
     iter++; // increase iteration
-    
-    // go through skip
-    while (queue.size() > 0) {
-        // get new branch point
-        nodea = queue.front();
-        queue.pop_front();
-    
-        // remember sibling of subtree (nodeb)
-        const Node *p = subtree->parent;
-        nodeb = (p->children[0] == subtree) ? p->children[1] : p->children[0];
-    
-        // perform only valid SPR moves
-        // NOTE: the tree may have changed, thus we need to double check
-        // whether the Spr is valid.
-        if (validSpr(tree, subtree, nodea)) {
-            performSpr(tree, subtree, nodea);
-            break;
-        }
+   //print queue
+    printf("\nthis is our non random queue\n");
+    list<Node*>::iterator indice=queue.begin();
+    for (int i=0; i<queue.size(); i++){
+      printf("\nname of the node %d\n",(*indice)->name);
+      indice++;
     }
 
+    //transform queue which is not random by construction
+    //to a randomqueue
+    Node *node1;
+    float randomindex=0;
+    list<Node*>::iterator theindex=randomqueue.begin();
+    sizequeue=queue.size();    
+
+    for (int i=0; i<sizequeue; i++){
+      node1 = queue.front();
+      if (randomqueue.size()==0){
+	 randomqueue.push_back(node1);
+      }else if(randomqueue.size()==1){
+
+	if (frand()>0.5){
+	  randomqueue.push_back(node1);}
+	else{ 
+	  randomqueue.push_front(node1);}
+      }
+      else{
+	randomindex=floor(randomqueue.size()*frand());      
+	theindex=randomqueue.begin(); 
+	for (int j=0; j<int(randomindex); j++){
+	  theindex++;
+	}      
+	randomqueue.insert(theindex,node1);
+      }
+       queue.pop_front();
+    }
+    //we have now our randomqueue
+
+    printf("\nthis is our random queue\n");
+    list<Node*>::iterator indices=randomqueue.begin();
+    for (int i=0; i<randomqueue.size(); i++){
+      printf("\nname of the node %d\n",(*indices)->name);
+      indices++;
+    }
+
+    while (randomqueue.size() > 0) {
+ 
+      nodea = randomqueue.front();
+      randomqueue.pop_front();      
+      // remember sibling of subtree (nodeb)
+      const Node *p = subtree->parent;
+      nodeb = (p->children[0] == subtree) ? p->children[1] : p->children[0];    
+      // perform only valid SPR moves
+      // NOTE: the tree may have changed, thus we need to double check
+      // whether the Spr is valid.
+      if (validSpr(tree, subtree, nodea)) {
+	performSpr(tree, subtree, nodea);
+	break;
+      }
+    }
+
+    randomqueue.clear();
+    revertsizequeue(tree);//count the number of nodes suitables for a new spr
     assert(tree->assertTree());
 }
 
 void SprNbrProposer::revert(Tree *tree)
 {
-    performSpr(tree, subtree, nodeb);
-    assert(tree->assertTree());
+
+  performSpr(tree, subtree, nodeb);
+  assert(tree->assertTree());
+
 }
+
+
+void SprNbrProposer::revertsizequeue(Tree *tree)
+{
+    
+  Node *a = subtree;
+
+  // find sibling (b) of a
+  Node *c = a->parent;
+  const int bi = (c->children[0] == a) ? 1 : 0;
+  Node *b = c->children[bi];
+    
+  // uninitialize path distances
+  pathdists.clear();
+  for (int i=0; i<tree->nnodes; i++)
+    pathdists.push_back(-1);
+    
+  // setup path distances and queue
+  pathdists[a->name] = 0;
+  pathdists[c->name] = 0;
+  pathdists[b->name] = 0;
+  queue.clear();
+  list<Node*> tmpqueue;
+  tmpqueue.push_back(c);
+  tmpqueue.push_back(b);
+
+  // traverse tree via depth first traversal
+  while (tmpqueue.size() > 0) {
+    Node *n = tmpqueue.front();
+    tmpqueue.pop_front();
+        
+    // do not traverse beyond radius
+    if (pathdists[n->name] >= radius)
+      continue;
+
+    // queue only valid new branch points:
+    // n must not be root, a, descendant of a, c (parent of a), or  
+    // b (sibling of a)
+    if (n->parent && n != subtree && n != b && n != c) {
+      queue.push_back(n);
+    }
+
+    // queue up unvisited neighboring edges
+    Node *w = n->parent;
+
+    if (w && pathdists[w->name] == -1) {
+      pathdists[w->name] = pathdists[n->name] + 1;
+      tmpqueue.push_back(w);
+    }
+
+    if (n->nchildren == 2) {
+      Node *u = n->children[0];
+      Node *v = n->children[1];
+
+      if (pathdists[u->name] == -1) {
+	pathdists[u->name] = pathdists[n->name] + 1;
+	tmpqueue.push_back(u);
+      }
+      
+      if (pathdists[v->name] == -1) {
+	pathdists[v->name] = pathdists[n->name] + 1;
+	tmpqueue.push_back(v);
+      }
+    }
+  }
+
+  sizequeuerevert=queue.size();
+ 
+}
+
+float SprNbrProposer::calcPropRatio(Tree *tree)
+{
+
+  float logratio=log(sizequeue)-log(sizequeuerevert);
+  return logratio;
+}
+
+
+
+float NniProposer::calcPropRatio(Tree *tree)
+{
+  return 0;
+}
+
 
 void SprNbrProposer::pickNewSubtree()
 {
     const Tree *tree = basetree;
-
     assert(basetree->nnodes >= 5);
-
+    
     // find subtree (a) to cut off (any node that is not root or child of root)
     int choice;
     do {
@@ -240,7 +371,7 @@ void SprNbrProposer::pickNewSubtree()
     // uninitialize path distances
     pathdists.clear();
     for (int i=0; i<tree->nnodes; i++)
-        pathdists.push_back(-1);
+      pathdists.push_back(-1);
     
     // setup path distances and queue
     pathdists[a->name] = 0;
@@ -292,6 +423,28 @@ void SprNbrProposer::pickNewSubtree()
     }
 }
 
+  ///////////////////////////LocalChangeProposer
+
+LocalChangeProposer::LocalChangeProposer(int niter) :
+    NniProposer(niter)
+{
+}
+
+
+void LocalChangeProposer::propose(Tree *tree)
+{
+  performLocalChange(tree, &m, &mstar);  
+}
+
+
+float LocalChangeProposer::calcPropRatio(Tree *tree)
+{
+  float result=(mstar/m)*(mstar/m)*(mstar/m);  
+  return result;
+}
+
+
+
 
 //=============================================================================
 // Recon root proposer
@@ -299,7 +452,6 @@ void SprNbrProposer::pickNewSubtree()
 void ReconRootProposer::propose(Tree *tree)
 {
     const float rerootProb = 1.0;
-    
     // propose new tree
     proposer->propose(tree);
     
@@ -372,8 +524,7 @@ void DupLossProposer::propose(Tree *tree)
     
     // save old topology
     oldtop = tree->copy();
-    
-    
+       
     // recon tree to species tree
     recon.ensureSize(tree->nnodes);
     events.ensureSize(tree->nnodes);
@@ -396,7 +547,6 @@ void DupLossProposer::propose(Tree *tree)
     proposer->reset();
     for (int i=0; i<quickiter; i++) {
         proposer->propose(tree);
-        
         // only allow unique proposals
         // but if I have been rejecting too much allow some non-uniques through
         if (uniques.has(tree) && trees.size() >= .1 * i) {
@@ -431,8 +581,6 @@ void DupLossProposer::propose(Tree *tree)
     
     for (int i=0; i<trees.size(); i++) {
         partsum = logadd(partsum, logls[i]);
-    
-        //printf("part %d %f (%f)\n", i, expf(partsum - sum), choice);
         
         if (choice < exp(partsum - sum)) {
             // propose tree i
@@ -479,7 +627,6 @@ UniqueProposer::~UniqueProposer()
 void UniqueProposer::propose(Tree *tree)
 {
     iter++;
-    
     for (int i=0;; i++) {
         printLog(LOG_HIGH, "search: unique trees seen %d (tries %d)\n", 
                  seenTrees.size(), i+1);
@@ -492,7 +639,8 @@ void UniqueProposer::propose(Tree *tree)
         } else {
             if (i < ntries) {
                 // revert and loop again
-                proposer->revert(tree);
+	      printf("on effectue un revert ds Uniqueproposer");
+	      proposer->revert(tree);
             } else {
                 // give up and return tree
                 break;
@@ -545,37 +693,58 @@ Tree *getInitialTree(string *genes, int nseqs, int seqlen, char **seqs,
 //=============================================================================
 // search logging
 
-void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species,
-                       int *recon=NULL, int *events=NULL)
+
+void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species, int *recon, int *events,FILE *infoduploss)
 {
-    if (stree) {
-        bool cleanupRecon = false;
-        if (!recon) {
-            recon = new int [tree->nnodes];
-            cleanupRecon = true;
-        }
-
-        bool cleanupEvents = false;    
-        if (!events) {
-            events = new int [tree->nnodes];
-            cleanupEvents = true;
-        }    
-
-        //assert(tree->assertTree());
+  if (stree) {
+    bool cleanupRecon = false;
+    if (!recon) {
+      recon = new int [tree->nnodes];
+      cleanupRecon = true;
+    }
     
-        reconcile(tree, stree, gene2species, recon);
-        labelEvents(tree, recon, events);
-        int losses = countLoss(tree, stree, recon);        
-        
-        // count dups
-        int dups = 0;
-        for (int i=0; i<tree->nnodes; i++)
-            if (events[i] == EVENT_DUP)
-                dups++;
-        
-        printLog(LOG_LOW, "search: dups = %d\n", dups);
-        printLog(LOG_LOW, "search: loss = %d\n", losses);
-        
+    bool cleanupEvents = false;    
+    if (!events) {
+      events = new int [tree->nnodes];
+      cleanupEvents = true;
+    }    
+	
+    for (int i=0; i<tree->nnodes; i++) {
+      Node *node = tree->nodes[i];
+      printf("%d\t%s\n", node->name,(node->longname).c_str());
+      printf("its reconciliation is%d\n",recon[i]);
+    }
+
+    int lossWGD=0;
+    int losses = countLoss(tree, stree, recon, events, &lossWGD);
+    printf("we have found %d losses \n",losses);
+    printLog(LOG_LOW, "search: loss = %d\n", losses);
+    printf("we have found %d losses at the WGD \n",lossWGD);
+    printLog(LOG_LOW, "search: loss at the WGD = %d\n", lossWGD);
+
+    // count dups
+    int dups = 0;
+    int dupWGD=0;
+    for (int i=0; i<tree->nnodes; i++){
+      if (events[i] == EVENT_DUP){
+	dups++;
+	if  (stree->nodes[recon[i]]->longname=="WGD_at"){
+	  dupWGD++;
+	}}
+    }
+
+    printf("we have found %d dup \n",dups);
+    printf("we have found %d dup at the WGD \n",dupWGD);
+    printLog(LOG_LOW, "search: dups = %d\n", dups);
+    printLog(LOG_LOW, "search: dups at the WGD = %d\n", dupWGD);
+    
+    fprintf(infoduploss,"%d",losses);
+    fprintf(infoduploss,"%d",lossWGD);
+    fprintf(infoduploss,"%d",dups);
+    fprintf(infoduploss,"%d",dupWGD);
+    fprintf(infoduploss,"\n");
+
+        //assert(tree->assertTree());        
         if (cleanupRecon)
             delete [] recon;
         if (cleanupEvents)
@@ -583,8 +752,10 @@ void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species,
     }                
     
     if (isLogLevel(LOG_LOW))
-        displayTree(tree, getLogFile());
+    displayTree(tree, getLogFile());
+
 }
+
 
 
 void printLogTree(int loglevel, Tree *tree)
@@ -605,13 +776,41 @@ public:
     double topp;
     double logp;
 
-    double calcJoint(Model *model, Tree *tree)
+  double calcJoint(Model *model, Tree *tree, double *likseq)
     {
+        printf("now starting setTree\n");
+	fflush(stdout);
+
         model->setTree(tree);
-        seqlk = model->likelihood();
-        branchp = model->branchPrior();
+
+	seqlk = model->likelihood();
+	printf("\noh voici seqlklikelihood %f\n",seqlk);
+	*likseq=seqlk;
+	//try to add something to have good harmonic
+	//	*likseq=exp(seqlk+90);
+
+	printf("\nre voici expseqlklikelihood %f\n",*likseq);
+
+	branchp = model->branchPrior();
+
+	printf("Branch Prior finished");
+	fflush(stdout);
+
+	///affichea virer
+	for (int i=0; i<tree->nnodes; i++) {
+	  Node *node = tree->nodes[i];
+	  printf("%d\t%s\n", node->name,(node->longname).c_str());
+	  for (int i=0; i<node->nchildren; i++){
+	    printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
+	  }
+	}
+   //endafficheavirer
+
         topp = model->topologyPrior();
         logp = seqlk + branchp + topp;
+	printf("sum finished");
+	fflush(stdout);
+
         return logp;
     }
 };
@@ -626,10 +825,111 @@ void printLogProb(int loglevel, Prob *prob)
 }
 
 
+
+//============================================================
+
+
+/*
+
+
+void calcSumForHarmonic(double likseq, double *harmonic1)
+{   
+
+*harmonic1= *harmonic1 + 1/likseq;
+
+}
+
+
+void calcFinalHarmonic(int niter, double *harmonic1)
+{
+  
+  //before
+  // *harmonic1=1/(*harmonic1/niter);
+  //end before
+
+  double result;
+
+  result= -log(90) + log(1/(*harmonic1/niter)) ;
+  
+  *harmonic1=exp(result);
+
+
+}
+
+
+void calcSumForHarmonic4(double likseq, double *sumnumerator, double *sumdenominator)
+{   
+
+  double value=0;
+  double delta=0;
+
+
+  for (int i=1; i<101; ++i){    
+    value += 0.01;
+    sumnumerator[i] +=  likseq/(value*delta + (1-delta)*likseq); 
+    sumdenominator[i] += 1/(value*delta + (1-delta)*likseq);
+
+    //    printf("\nvoici i %d\n",i);
+    // printf("\nvoici sumnumerator %f\n",sumnumerator[10]);
+    //printf("\n o lala voici sumdenominator %f\n",sumdenominator[i]);
+  
+
+
+  }
+
+
+}
+
+
+void calcFinalHarmonic4(int niter, double *harmonic4, double *sumnumerator, 
+double *sumdenominator)
+{
+
+  double value=0;
+  double delta=0.1;
+  double num, denom, diff, olddiff;
+  *harmonic4=3;
+  olddiff=5;
+
+
+  for (int i=1; i<101; ++i){ 
+
+    //  printf("\nvoici i %d\n",i);
+    //printf("\nvoici sumnumerator %f\n",sumnumerator[i]);
+    //printf("\nvoici sumdenominator %f\n",sumdenominator[i]);
+
+    value += 0.01;
+    num=delta*niter/(1-delta) + sumnumerator[i]; 
+    //    denom= delta*niter/(value*(1-delta)) + sumdenominator[i];
+    denom= value*delta*niter/(1-delta) + sumdenominator[i];
+    diff= (value-num/denom)*(value-num/denom);
+
+    // printf("\nvoici diff %f\n",diff);
+
+    if ( min(diff,olddiff)!= olddiff ){
+      *harmonic4=value;
+      olddiff=diff;
+    }
+
+  }
+
+
+}
+
+
+*/
+
+
+
+
+
+
+
 //=============================================================================
 // Search Climb
 
-TreeSearchClimb::TreeSearchClimb(Model *model, TopologyProposer *proposer) :
+//TreeSearchClimb::TreeSearchClimb(Model *model, TopologyProposer *proposer) :
+  TreeSearchClimb::TreeSearchClimb(Model *model, MixProposer *proposer) :
     model(model),
     proposer(proposer)
 {
@@ -641,7 +941,7 @@ TreeSearchClimb::~TreeSearchClimb()
 
 
 Tree *TreeSearchClimb::search(Tree *initTree, string *genes, 
-			      int nseqs, int seqlen, char **seqs)
+			      int nseqs, int seqlen, char **seqs, string outputprefix,int method)
 {
     Tree *toptree = NULL;
     double toplogp = -INFINITY, nextlogp;
@@ -650,6 +950,12 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     Timer proposalTimer;
 
     Prob prob;
+    double likseq, oldseq;
+
+
+    //    double likseq, oldseq, harmonic1, harmonic4;
+
+    //ExtendArray<double> sumnumerator(100), sumdenominator(100);
     
     // setup search debug: testing against know correct tree
     Tree *correct = proposer->getCorrect();
@@ -657,16 +963,17 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     if (correct) {
         // determine probability of correct tree
         parsimony(correct, nseqs, seqs); // get initial branch lengths
-        correctLogp = prob.calcJoint(model, correct);
+        correctLogp = prob.calcJoint(model, correct, &likseq);
         printLog(LOG_LOW, "search: correct tree lnl = %f\n", correctLogp);
     }
 
+
     
     // determine initial tree topology
-    if (initTree == NULL)
-        tree = getInitialTree(genes, nseqs, seqlen, seqs,
-                              model->getSpeciesTree(), 
-                              model->getGene2species());
+    //   if (initTree == NULL)
+    //  tree = getInitialTree(genes, nseqs, seqlen, seqs,
+    //                        model->getSpeciesTree(), 
+    //                        model->getGene2species());
 
 
     // special cases (1 and 2 leaves)
@@ -674,41 +981,121 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
         return tree->copy();
     }
     
-    
-    ExtendArray<int> recon(tree->nnodes);
-    ExtendArray<int> events(tree->nnodes);
-    
+
     // calc probability of initial tree
     parsimony(tree, nseqs, seqs); // get initial branch lengths
-    toplogp = prob.calcJoint(model, tree);
+    toplogp = prob.calcJoint(model, tree, &likseq);
+    oldseq=likseq;
+
+
+    /*
+    //harmonic1 corresponds to the estimator 1 in p21 of Raftery and Newton JRSSB
+    harmonic1=0;
+    calcSumForHarmonic(likseq, &harmonic1);
+
+    //harmonic4 is the fourth estimator of Raftery and Newton p22 JRSSB
+    harmonic4=0;
+    calcSumForHarmonic4(likseq, sumnumerator, sumdenominator);
+
+    printf("\n voici le premier likseq%f\n",likseq);
+    */
+
     toptree = tree->copy();
-    
     
     // log initial tree
     printLog(LOG_LOW, "search: initial\n");
     printLogProb(LOG_LOW, &prob);
     printLogTree(LOG_LOW, tree);
-    printSearchStatus(tree, model->getSpeciesTree(), 
-                      model->getGene2species(), &recon[0], &events[0]);
-    
-    
+
+    string outTreeSampledFile = outputprefix  + ".treesampled";
+    FILE *filetrees=fopen(outTreeSampledFile.c_str(), "w");
+    writeNewickTree(filetrees, tree, 0, true);
+    fprintf(filetrees,"\n");
+ 
+
+    string outDupLossFile = outputprefix  + ".duploss";
+    FILE *fileduploss=fopen(outDupLossFile.c_str(), "w");
+
+    printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
+   
     int naccept = 0;
     int nreject = 0;
-    
     // search loop
     proposer->reset();
+    
+    printf("\non est avt la boucle for\n");
+    fflush(stdout);
+   
     for (int i=0; proposer->more(); i++) {
         printLog(LOG_LOW, "search: iter %d\n", i);
     
         // propose new tree 
         proposalTimer.start();
+	printf("\non est avt le propose de treesearchclimb\n");
+
+	//avirer apres
+	printf("\noh on est juste avt de changer\n");
+	//	writeNewickTree(stdout, tree,true);
+   
+
+   printf("\n on affiche notre gene tree\n");
+    for (int k=0; k<tree->nnodes; k++) {
+      Node *node = tree->nodes[k];
+      printf("%d\t%s\n", node->name,(node->longname).c_str());
+      for (int j=0; j<node->nchildren; j++){
+	printf("\t%d\t%s\n", node->children[j]->name, (node->children[j]->longname).c_str());
+      }
+    }
+   writeNewickTree(stdout, tree,true);
+	//end eavirer
+
         proposer->propose(tree);
-        proposer->testCorrect(tree);
+	printf("\non est apres le propose de treesearchclimb\n");
+
+	//avirer apres
+  printf("\n on affiche notre gene tree apre le propose\n");
+    for (int k=0; k<tree->nnodes; k++) {
+      Node *node = tree->nodes[k];
+      printf("%d\t%s\n", node->name,(node->longname).c_str());
+      for (int j=0; j<node->nchildren; j++){
+	printf("\t%d\t%s\n", node->children[j]->name, (node->children[j]->longname).c_str());
+      }
+    }
+ writeNewickTree(stdout, tree,true);
+ //end a virer apres
+	
+	printf("\nle voici notre i%d\n",i);
+	fflush(stdout);
+
+	//avirer apres
+	printf("\noh on est juste apres avoir changer\n");
+	//	writeNewickTree(stdout, tree,true);
+	//end eavirer
+
+
+	proposer->testCorrect(tree);
         proposal_runtime += proposalTimer.time();
         
         // calculate probability of proposal
-        nextlogp = prob.calcJoint(model, tree);
-        bool accept = (nextlogp > toplogp);
+        nextlogp = prob.calcJoint(model, tree, &likseq);
+
+	//avirer apres
+	printf("\noh on est juste apres avoir calcule le joint\n");
+	fflush(stdout);
+	//	writeNewickTree(stdout, tree,true);
+	//end eavirer
+
+	bool accept=0;
+	if (method==1){
+	  //MCMC
+	float logPropRatio=proposer->calcRatio(tree);
+	printf("\nvoici le logPropRatio%f\n", logPropRatio);
+	accept = ((nextlogp > toplogp) ||  (frand()<exp(nextlogp-toplogp+logPropRatio)));
+	}else{
+	  //ML ie maximum a posteriori
+	 accept = (nextlogp > toplogp);
+	}
+
 
         // log proposal
         if (accept)
@@ -743,21 +1130,72 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
             delete toptree;
             toptree = tree->copy();
 
-            printSearchStatus(tree, 
-                              model->getSpeciesTree(), 
-                              model->getGene2species(), &recon[0], &events[0]);
+	    /*
+	    calcSumForHarmonic(likseq, &harmonic1);
+	    calcSumForHarmonic4(likseq, sumnumerator, sumdenominator);
+	    */
+
+
+	    //old
+	    //oldseq=likseq;
+	    //end old
+
+	    //try something
+	    if (likseq>oldseq){
+	      oldseq=likseq;}
+	    //end try
+
+
+	    printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
+	    
+	    writeNewickTree(filetrees, tree, 0, true);
+	    fprintf(filetrees,"\n");
 
         } else {           
             // display rejected tree
             if (isLogLevel(LOG_MEDIUM))
-                printSearchStatus(tree, model->getSpeciesTree(), 
-				  model->getGene2species(), 
-                                  &recon[0], &events[0]);
-            
-            // reject, undo topology change
-            nreject++;
-            proposer->accept(false);             
-            proposer->revert(tree);
+	      printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
+            	  
+	      nreject++;
+	      proposer->accept(false); 
+              printf("\non rejette\n");
+
+	      //try something
+	      if (likseq>oldseq){
+	      oldseq=likseq;}
+	      //end try
+
+
+
+	      //a virer apres
+	      // writeNewickTree(filetrees, tree, 0, true);
+	       printf("\noh on effectue un revert\n");
+	       //  writeNewickTree(stdout, tree,true);
+	       //end a virer apres
+
+	       //inutile
+	       //proposer->revert(tree);
+	      //end inutile
+
+	      delete tree;
+	      tree=toptree->copy();
+
+
+	      /*
+	      calcSumForHarmonic(oldseq, &harmonic1);
+	      calcSumForHarmonic4(oldseq, sumnumerator, sumdenominator);
+	      */
+
+
+	      // reject, undo topology change
+	      writeNewickTree(filetrees, tree, 0, true);
+	      fprintf(filetrees,"\n");
+
+	      //avirerapres
+	       printf("\noh on a effectue un revert retour ds search\n");
+	       //   writeNewickTree(stdout, tree,true);
+	       //end a virer
+        
         }
 
         printLog(LOG_LOW, "\n");
@@ -767,12 +1205,56 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     printLog(LOG_LOW, "accept rate: %f\n", naccept / double(naccept+nreject));
 
     // call probability break down again of top tree
-    prob.calcJoint(model, toptree);
+    prob.calcJoint(model, toptree, &likseq);
     
     // log final tree
     printLog(LOG_LOW, "search: final\n");
     printLogProb(LOG_LOW, &prob);
+    fclose(filetrees);
+    fclose(fileduploss);
+
+    // print the last likelihood of the sequence
+
+    string loglikelihoodseqFile = outputprefix  + ".loglikelihoodseq";
+    FILE *fileloglikelihoodseq=fopen(loglikelihoodseqFile.c_str(), "w");
+   
+    //old
+    //fprintf(fileloglikelihoodseq,"%e",likseq);
+    //end old
+    fprintf(fileloglikelihoodseq,"%e",oldseq);
+
+
+    fclose(fileloglikelihoodseq);
+    //
+
+
+
+    /*
+
+    //Bayes factor
+    // printf("\nharmonic is %f\n",harmonic);
+
+    calcFinalHarmonic(proposer->getniter(),&harmonic1);
+    calcFinalHarmonic4(proposer->getniter(), &harmonic4, sumnumerator, sumdenominator);
+
+
+    string harmonicFile = outputprefix  + ".harmonic";
+    FILE *fileharmonic=fopen(harmonicFile.c_str(), "w");
+    fprintf(fileharmonic,"%f",harmonic1);
     
+    fclose(fileharmonic);
+ 
+    printf("\nthe marginal likelihood is %f\n",harmonic1);
+    printf("\nthe marginal likelihood is %f\n",harmonic4);
+    //end Bayes Factor
+
+
+    */
+
+
+
+
+
     // clean up
     if (initTree == NULL)
         delete tree;
@@ -781,7 +1263,7 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
 }
 
 
-
+/*
 
 extern "C" {
 
@@ -851,5 +1333,5 @@ Tree *searchClimb(int niter, int quickiter,
 
 } // extern "C"
 
-
+*/
 } // namespace spidir

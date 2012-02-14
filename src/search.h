@@ -66,6 +66,9 @@ public:
     virtual bool more() { return false; }
     virtual void reset() {}
     virtual void accept(bool accepted) {}
+    virtual float calcPropRatio(Tree *tree){}
+
+
 
     virtual void setCorrect(Tree *tree) { correctTree = tree; }
     virtual Tree *getCorrect() { return correctTree; }
@@ -89,48 +92,52 @@ protected:
 class NniProposer: public TopologyProposer
 {
 public:
-    NniProposer(int niter=500);
+  NniProposer(int niter=500);
+  virtual void propose(Tree *tree);
+  virtual void revert(Tree *tree);
+  virtual bool more() { return iter < niter; }
+  virtual void reset() { iter = 0; }
+  virtual float calcPropRatio(Tree *tree);
 
-    virtual void propose(Tree *tree);
-    virtual void revert(Tree *tree);
-    virtual bool more() { return iter < niter; }
-    virtual void reset() { iter = 0; }
+ protected:    
+  int niter;
+  int iter;
+  
+  Node *nodea;
+  Node *nodeb;
 
-
-protected:    
-    int niter;
-    int iter;
-
-    Node *nodea;
-    Node *nodeb;
 };
-
+ 
 
 class SprProposer: public NniProposer
 {
 public:
     SprProposer(int niter=500);
-
     virtual void propose(Tree *tree);
     virtual void revert(Tree *tree);
 
 protected:    
     int niter;
     int iter;
-
     Node *nodea;
     Node *nodeb;
     Node *nodec;
 };
 
 
+
+
+
 class SprNbrProposer: public NniProposer
 {
 public:
-    SprNbrProposer(int niter=500, int radius=4);
+  SprNbrProposer(int niter=500, int radius=4);
 
     virtual void propose(Tree *tree);
     virtual void revert(Tree *tree);
+    virtual void revertsizequeue(Tree *tree);
+    virtual float calcPropRatio(Tree *tree);
+    
     void reset() { 
         iter = 0; 
         reverted = false;
@@ -144,9 +151,28 @@ protected:
     Tree *basetree;
     Node *subtree;
     list<Node*> queue;
+    list<Node*> randomqueue;
+    int sizequeue;    
+    int sizequeuerevert;
     vector<int> pathdists;
     bool reverted;
 };
+
+
+class LocalChangeProposer: public NniProposer
+{
+public:
+    LocalChangeProposer(int niter=500);
+    virtual void propose(Tree *tree);
+    virtual float calcPropRatio(Tree *tree);
+
+protected:    
+    int niter;
+    float m;
+    float  mstar;
+
+};
+
 
 
 class MixProposer: public TopologyProposer
@@ -154,34 +180,42 @@ class MixProposer: public TopologyProposer
 public:
     MixProposer(int niter=500) : totalWeight(0), niter(niter), iter(0) {}
 
-    virtual void propose(Tree *tree);
-    virtual void revert(Tree *tree);    
-    virtual bool more() { return iter < niter; }
-    virtual void reset() { 
-        iter = 0; 
+  virtual void propose(Tree *tree);
+  virtual void revert(Tree *tree);    
+  virtual bool more() { return iter < niter; }
+  virtual void reset() { 
+    iter = 0; 
 
-        // propagate reset
-        for (unsigned int i=0; i<methods.size(); i++)
-            methods[i].first->reset();
-    }
+    // propagate reset
+    for (unsigned int i=0; i<methods.size(); i++)
+      methods[i].first->reset();
+  }
 
-    void addProposer(TopologyProposer *proposer, float weight);
+  virtual float calcRatio(Tree *tree){
+    return methods[0].first->calcPropRatio(tree);
+  }
+  
+  int getniter(){
+    return niter;
+  }
 
-protected:
+  void addProposer(TopologyProposer *proposer, float weight);
 
-    float totalWeight;
-    typedef pair<TopologyProposer*,float> Method;
-    vector<Method> methods;
-    int lastPropose;
-    int niter;
-    int iter;
+ protected:
+
+  float totalWeight;
+  typedef pair<TopologyProposer*,float> Method;
+  vector<Method> methods;
+  int lastPropose;
+  int niter;
+  int iter;
 };
 
 
 class ReconRootProposer: public TopologyProposer
 {
 public:
-    ReconRootProposer(TopologyProposer *proposer,
+ ReconRootProposer(TopologyProposer *proposer,
                       SpeciesTree *stree=NULL, int *gene2species=NULL) :
         proposer(proposer),
         stree(stree),
@@ -279,18 +313,16 @@ class DefaultSearch
 public:
     DefaultSearch(int niter, int quickiter,
                   SpeciesTree *stree, int *gene2species,
-                  float duprate, float lossrate, float sprrate=.5,
-                  int radius=3) :
+                  float duprate, float lossrate, float sprrate=.5, int propid=1, int radius=3) :
         stree(stree),
         gene2species(gene2species),
         radius(radius),
-
+	propid(propid),
         nni(niter),
         spr(niter),
         sprnbr(niter, radius),
-
+	locchange(niter),
         mix(niter),
-
         rooted(&mix, stree, gene2species),
         unique(&rooted, niter),
         dl(&unique, stree, gene2species, 
@@ -299,12 +331,16 @@ public:
         mix2(niter)
         
     {
-        mix.addProposer(&nni, (1 - sprrate) / 2.0);
-        mix.addProposer(&sprnbr, sprrate);
-        mix.addProposer(&spr, (1 - sprrate) / 2.0);
 
-        mix2.addProposer(&unique, .2);
-        mix2.addProposer(&dl, .8);
+      	if (propid==1){
+	  mix.addProposer(&sprnbr, sprrate);}
+	else if (propid==0){
+	  mix.addProposer(&nni, sprrate);
+	}else{
+	  mix.addProposer(&locchange, sprrate);	  
+	}
+
+
     }
         
     int niter;
@@ -314,11 +350,12 @@ public:
     float duprate;
     float lossrate;
     int radius;
+    int propid;
     
     NniProposer nni;
     SprProposer spr;
     SprNbrProposer sprnbr;
-    
+    LocalChangeProposer locchange;
     MixProposer mix;
 
     ReconRootProposer rooted;
@@ -382,17 +419,18 @@ class TreeSearchClimb : public TreeSearch
 {
 public:
 
-    TreeSearchClimb(Model *model, TopologyProposer *proposer);
+    TreeSearchClimb(Model *model, MixProposer *proposer);
     virtual ~TreeSearchClimb();
-
     virtual Tree *search(Tree *initTree, 
 			 string *genes, 
-			 int nseqs, int seqlen, char **seqs);
+			  int nseqs, int seqlen, char **seqs, string outputprefix, int method);
+
+    Model *getmodel()
+    {return model; }
 
 protected:
     Model *model;
-    TopologyProposer *proposer;
-
+    MixProposer *proposer;
 };
 
 

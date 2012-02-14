@@ -70,8 +70,7 @@ bool SpidirParams::order(SpeciesTree *stree)
     }
     
     ExtendArray<Node*> nodeorder(0, stree->nnodes);
-    getTreePreOrder(stree, &nodeorder);
-        
+    getTreePreOrder(stree, &nodeorder);        
 
     // make interior node names
     ExtendArray<int> inodes(stree->nnodes);
@@ -84,9 +83,8 @@ bool SpidirParams::order(SpeciesTree *stree)
         } else {
             inodes[node->name] = inodename++;
         }
-    }
-    
-    
+    }        
+
     // loop through preordered nodes to construct permutation
     ExtendArray<int> invperm(0, stree->nnodes);
         
@@ -101,10 +99,11 @@ bool SpidirParams::order(SpeciesTree *stree)
         int id;
         bool isint = (sscanf(names[j].c_str(), "%d", &id) == 1);
         
+
         for (int i=0; i<stree->nnodes; i++) {
             if (stree->nodes[i]->isLeaf()) {
                 // if leaf, check if names match
-                if (names[j] == stree->nodes[i]->longname) {
+                if (names[j] == stree->nodes[i]->longname) {		  
                     invperm.append(i);
                     break;
                 }

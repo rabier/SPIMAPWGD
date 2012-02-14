@@ -196,25 +196,33 @@ public:
             return false;
         
         int i;
+	
         for (i=1; i<argc; i++) {
+	 
             bool parsed = false;
             
             // detect stop parsing options
-            if (!strcmp(argv[i], "--")) {
-                i++;
-                break;
-            }
-            
+	    
+	    if (!strcmp(argv[i], "--")) {
+	      i++;
+	      break;
+		}
+
+	 
+
             for (unsigned int j=0; j<rules.size(); j++) {
-                if (strcmp(argv[i], "") &&
+	    
+	      
+	      if (strcmp(argv[i], "") &&
                     argv[i] == rules[j]->shortarg ||
                     argv[i] == rules[j]->longarg)
-                {
+                {	   
                     int consume = rules[j]->parse(argc - i-1, &argv[i+1]);
                     if (consume == -1)
                         return false;
-                    i += consume;
+                    i += consume;		    
                     parsed = true;
+		    
                     break;
                 }
             }
@@ -233,9 +241,9 @@ public:
         
         
         // remaining arguments are "rest" arguments
-        for (; i<argc; i++)
+        for (; i<argc; i++){	  
             rest.push_back(argv[i]);
-        
+        }
         return true;
     }
     

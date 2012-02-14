@@ -201,30 +201,31 @@ void labelEvents(Tree *tree, int *recon, int *events)
 }
 
 
-int countLoss_recurse(Node *node, SpeciesTree *stree, int *recon)
-{
-    int loss = countLossNode(node, stree, recon);
 
+  int countLoss_recurse(Node *node, SpeciesTree *stree, int *recon, int *events, int *lossWGD)
+{
+  int loss = countLossNode(node, stree, recon, events, lossWGD);
     // recurse
     for (int i=0; i<node->nchildren; i++)
-        loss += countLoss_recurse(node->children[i], stree, recon);
+      loss += countLoss_recurse(node->children[i], stree, recon, events, lossWGD);
 
     return loss;
 }
 
 
-int countLoss(Tree *tree, SpeciesTree *stree, int *recon)
+  int countLoss(Tree *tree, SpeciesTree *stree, int *recon, int *events,int *lossWGD)
 {
-    return countLoss_recurse(tree->root, stree, recon);
+  return countLoss_recurse(tree->root, stree, recon, events, lossWGD);
 }
 
 
-// assumes binary tree
-int countLossNode(Node *node, SpeciesTree *stree, int *recon)
+
+  int countLossNode(Node *node, SpeciesTree *stree, int *recon,  int *events,int *lossWGD)
 {
     int loss = 0;
     
     // if not parent, then no losses
+    //so it assumes that the root of our gene tree is a speciation
     if (node->parent == NULL)
         return 0;
     
@@ -240,20 +241,30 @@ int countLossNode(Node *node, SpeciesTree *stree, int *recon)
     Node *ptr = sstart->parent;
     while (ptr != send) {
         // process ptr
+
+      if (ptr->longname=="WGD_at"){
+	loss += 1;
+	printf("one loss at the WGD\n");
+	*lossWGD=*lossWGD+1;
+      }
+      else{
         loss += ptr->nchildren - 1;
-        
+      }
         // go up species tree
         ptr = ptr->parent;
     }
     
     // determine whether node->parent is a dup
     // if so, send (a.k.a. species end) is part of species path
-    if (send->name == recon[node->parent->children[0]->name] ||
-        send->name == recon[node->parent->children[1]->name])
-         loss += send->nchildren - 1;
+    if (events[node->parent->name]==EVENT_DUP){//ie duplication
+       loss += send->nchildren - 1;
+    }
+
         
     return loss;
 }
+
+
 
 
 // insert new speciation node above node

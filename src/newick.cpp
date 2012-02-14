@@ -204,6 +204,22 @@ Tree *readNewickTree(FILE *infile, Tree *tree)
     int depth = 0;
     tree->root = readNewickNode(infile, tree, NULL, depth);
    
+    //me
+    printf("\n avt loperation leaf en premier\n");
+
+    for (int i=0; i<tree->nnodes; i++) {
+      Node *thenode = tree->nodes[i];
+      printf("%d\t%s\n", thenode->name,(thenode->longname).c_str());
+      for (int i=0; i<thenode->nchildren; i++){
+	printf("\t%d\t%s\n", thenode->children[i]->name, (thenode->children[i]->longname).c_str());
+      }
+    }
+
+    printf("\n place au leaf en premier\n");
+
+    //end me
+
+
     // renumber nodes in a valid order
     // 1. leaves come first
     // 2. root is last

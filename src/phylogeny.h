@@ -123,9 +123,16 @@ void reconcile(Tree *tree, SpeciesTree *stree,
                int *gene2species, int *recon);
 void labelEvents(Tree *tree, int *recon, int *events);
 
-int countLoss_recurse(Node *node, SpeciesTree *stree, int *recon);
-int countLoss(Tree *tree, SpeciesTree *stree, int *recon);
-int countLossNode(Node *node, SpeciesTree *stree, int *recon);
+
+///my version
+ int countLoss_recurse(Node *node, SpeciesTree *stree, int *recon, int *events,
+int *lossWGD);
+ int countLoss(Tree *tree, SpeciesTree *stree, int *recon, int *events, int *lossWGD);
+ int countLossNode(Node *node, SpeciesTree *stree, int *recon, int *events, int *lossWGD);
+///
+
+
+
 
 
 Node *treeLca(SpeciesTree *stree, Node *node1, Node *node2);
