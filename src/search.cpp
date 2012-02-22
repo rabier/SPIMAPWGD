@@ -776,8 +776,8 @@ public:
     double topp;
     double logp;
 
-  double calcJoint(Model *model, Tree *tree, double *likseq)
-    {
+  double calcJoint(Model *model, Tree *tree, double *theseqlik, double *thelogp)
+  {
         printf("now starting setTree\n");
 	fflush(stdout);
 
@@ -785,11 +785,8 @@ public:
 
 	seqlk = model->likelihood();
 	printf("\noh voici seqlklikelihood %f\n",seqlk);
-	*likseq=seqlk;
-	//try to add something to have good harmonic
-	//	*likseq=exp(seqlk+90);
-
-	printf("\nre voici expseqlklikelihood %f\n",*likseq);
+	*theseqlik=seqlk;
+	printf("\nre voici expseqlklikelihood %f\n",*theseqlik);
 
 	branchp = model->branchPrior();
 
@@ -808,6 +805,7 @@ public:
 
         topp = model->topologyPrior();
         logp = seqlk + branchp + topp;
+	*thelogp=logp;
 	printf("sum finished");
 	fflush(stdout);
 
@@ -950,12 +948,8 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     Timer proposalTimer;
 
     Prob prob;
-    double likseq, oldseq;
+    double theseqlik, theoldseqlik, thelogp, theoldlogp;
 
-
-    //    double likseq, oldseq, harmonic1, harmonic4;
-
-    //ExtendArray<double> sumnumerator(100), sumdenominator(100);
     
     // setup search debug: testing against know correct tree
     Tree *correct = proposer->getCorrect();
@@ -963,7 +957,7 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     if (correct) {
         // determine probability of correct tree
         parsimony(correct, nseqs, seqs); // get initial branch lengths
-        correctLogp = prob.calcJoint(model, correct, &likseq);
+        correctLogp = prob.calcJoint(model, correct, &theseqlik, &thelogp);
         printLog(LOG_LOW, "search: correct tree lnl = %f\n", correctLogp);
     }
 
@@ -984,21 +978,9 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
 
     // calc probability of initial tree
     parsimony(tree, nseqs, seqs); // get initial branch lengths
-    toplogp = prob.calcJoint(model, tree, &likseq);
-    oldseq=likseq;
-
-
-    /*
-    //harmonic1 corresponds to the estimator 1 in p21 of Raftery and Newton JRSSB
-    harmonic1=0;
-    calcSumForHarmonic(likseq, &harmonic1);
-
-    //harmonic4 is the fourth estimator of Raftery and Newton p22 JRSSB
-    harmonic4=0;
-    calcSumForHarmonic4(likseq, sumnumerator, sumdenominator);
-
-    printf("\n voici le premier likseq%f\n",likseq);
-    */
+    toplogp = prob.calcJoint(model, tree, &theseqlik, &thelogp);
+    theoldseqlik=theseqlik;
+    theoldlogp=thelogp;
 
     toptree = tree->copy();
     
@@ -1077,7 +1059,7 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
         proposal_runtime += proposalTimer.time();
         
         // calculate probability of proposal
-        nextlogp = prob.calcJoint(model, tree, &likseq);
+        nextlogp = prob.calcJoint(model, tree, &theseqlik, &thelogp);
 
 	//avirer apres
 	printf("\noh on est juste apres avoir calcule le joint\n");
@@ -1129,20 +1111,15 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
             toplogp = nextlogp;
             delete toptree;
             toptree = tree->copy();
-
-	    /*
-	    calcSumForHarmonic(likseq, &harmonic1);
-	    calcSumForHarmonic4(likseq, sumnumerator, sumdenominator);
-	    */
-
-
-	    //old
-	    //oldseq=likseq;
-	    //end old
+	   
+	    //try something
+	    if (theseqlik>theoldseqlik){
+	      theoldseqlik=theseqlik;}
+	    //end try
 
 	    //try something
-	    if (likseq>oldseq){
-	      oldseq=likseq;}
+	    if (thelogp>theoldlogp){
+	      theoldlogp=thelogp;}
 	    //end try
 
 
@@ -1158,43 +1135,23 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
             	  
 	      nreject++;
 	      proposer->accept(false); 
-              printf("\non rejette\n");
-
+ 
 	      //try something
-	      if (likseq>oldseq){
-	      oldseq=likseq;}
+	      if (theseqlik>theoldseqlik){
+	      theoldseqlik=theseqlik;}
 	      //end try
 
-
-
-	      //a virer apres
-	      // writeNewickTree(filetrees, tree, 0, true);
-	       printf("\noh on effectue un revert\n");
-	       //  writeNewickTree(stdout, tree,true);
-	       //end a virer apres
-
-	       //inutile
-	       //proposer->revert(tree);
-	      //end inutile
+	      //try something
+	      if (thelogp>theoldlogp){
+	      theoldlogp=thelogp;}
+	      //end try
 
 	      delete tree;
 	      tree=toptree->copy();
 
-
-	      /*
-	      calcSumForHarmonic(oldseq, &harmonic1);
-	      calcSumForHarmonic4(oldseq, sumnumerator, sumdenominator);
-	      */
-
-
 	      // reject, undo topology change
 	      writeNewickTree(filetrees, tree, 0, true);
 	      fprintf(filetrees,"\n");
-
-	      //avirerapres
-	       printf("\noh on a effectue un revert retour ds search\n");
-	       //   writeNewickTree(stdout, tree,true);
-	       //end a virer
         
         }
 
@@ -1205,53 +1162,32 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     printLog(LOG_LOW, "accept rate: %f\n", naccept / double(naccept+nreject));
 
     // call probability break down again of top tree
-    prob.calcJoint(model, toptree, &likseq);
+    prob.calcJoint(model, toptree, &theseqlik, &thelogp);
     
     // log final tree
     printLog(LOG_LOW, "search: final\n");
     printLogProb(LOG_LOW, &prob);
+
+    printSearchStatus(toptree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
+
+
     fclose(filetrees);
     fclose(fileduploss);
 
     // print the last likelihood of the sequence
 
     string loglikelihoodseqFile = outputprefix  + ".loglikelihoodseq";
-    FILE *fileloglikelihoodseq=fopen(loglikelihoodseqFile.c_str(), "w");
-   
-    //old
-    //fprintf(fileloglikelihoodseq,"%e",likseq);
-    //end old
-    fprintf(fileloglikelihoodseq,"%e",oldseq);
-
-
+    FILE *fileloglikelihoodseq=fopen(loglikelihoodseqFile.c_str(), "w");     
+    fprintf(fileloglikelihoodseq,"%e",theoldseqlik);
     fclose(fileloglikelihoodseq);
     //
 
-
-
-    /*
-
-    //Bayes factor
-    // printf("\nharmonic is %f\n",harmonic);
-
-    calcFinalHarmonic(proposer->getniter(),&harmonic1);
-    calcFinalHarmonic4(proposer->getniter(), &harmonic4, sumnumerator, sumdenominator);
-
-
-    string harmonicFile = outputprefix  + ".harmonic";
-    FILE *fileharmonic=fopen(harmonicFile.c_str(), "w");
-    fprintf(fileharmonic,"%f",harmonic1);
-    
-    fclose(fileharmonic);
- 
-    printf("\nthe marginal likelihood is %f\n",harmonic1);
-    printf("\nthe marginal likelihood is %f\n",harmonic4);
-    //end Bayes Factor
-
-
-    */
-
-
+    // print the last likelihood of the sequence
+    string logpFile = outputprefix  + ".completeloglikelihood";
+    FILE *filelogpFile=fopen(logpFile.c_str(), "w");     
+    fprintf(filelogpFile,"%e",theoldlogp);
+    fclose(filelogpFile);
+    //
 
 
 
