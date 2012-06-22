@@ -244,7 +244,7 @@ void labelEvents(Tree *tree, int *recon, int *events)
 
       if (ptr->longname=="WGD_at"){
 	loss += 1;
-	printf("one loss at the WGD\n");
+	//printf("one loss at the WGD\n");
 	*lossWGD=*lossWGD+1;
       }
       else{
@@ -610,24 +610,11 @@ SpeciesTree *SpeciesTree::copy()
 				    theWGD[k]->totalDist);
 				
 
-      tree2->addWGD(WGDnew);
-      //     printf("\nvoila le premier nom associe %d\n", tree2->theWGD[k]->WGD_before->name);
+      tree2->addWGD(WGDnew);  
 
     }
 
-    //printf("olala");
-    //printf("nbre de WGD %d", nWGD);
-
-    //  for (int k=0;k<nWGD;k++){
-      
-    //  printf("\nvoila k  %d\n", k);
-    //  printf("\nvoila la Perte %f\n", tree2->theWGD[k]->lossProb);
-
-
-    //	     }
-//end try
-
-
+ 
 
     return tree2;
 }
