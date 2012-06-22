@@ -17,9 +17,7 @@
 #include "common.h"
 #include "phylogeny.h"
 #include "Tree.h"
-// maybe remove treevis
 #include "treevis.h"
-//
 #include "top_prior_extra.h"
 
 
@@ -310,7 +308,7 @@ double birthDeathTreePrior(Tree *tree, Tree *stree, int *recon,
 // NOTE: assumes binary species tree
 double birthDeathTreePriorFull(Tree *tree, Tree *stree, int *recon, 
                                int *events, float birthRate, float deathRate,
-                               double *doomtable)
+                               double *doomtable, float q)
 {
   // ExtendArray<int> recon2(0, 2 * tree->nnodes);
   int upperbound;//upperbound for the number of nodes in the gene tree (included hidden nodes);
@@ -322,16 +320,12 @@ double birthDeathTreePriorFull(Tree *tree, Tree *stree, int *recon,
   ExtendArray<int> events2(0,upperbound);
   events2.extend(events, tree->nnodes);
 	fflush(stdout);
-
-
-  //printf("gene tree without implied nodes\n");
-  // displayTree(tree, stdout, 0.2);
-
+   
    int addedNodes = addImpliedSpecNodes(tree, stree, recon2, events2);
 
    double p = birthDeathTreePrior2(tree, stree, recon2, events2, 
 				  birthRate, deathRate,
-				  doomtable);
+				   doomtable,q);
 
 
    removeImpliedSpecNodes(tree, addedNodes);

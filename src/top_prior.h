@@ -28,7 +28,7 @@ double birthDeathTreePrior(Tree *tree, Tree *stree, int *recon,
 
 double birthDeathTreePriorFull(Tree *tree, Tree *stree, int *recon, 
                               int *events, float birth, float death,
-                              double *doomtable);
+			       double *doomtable, float q);
 
 
 
