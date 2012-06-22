@@ -90,10 +90,10 @@ void NniProposer::propose(Tree *tree)
 
 void NniProposer::revert(Tree *tree)
 {
-  writeNewickTree(stdout, tree,true);
+  //writeNewickTree(stdout, tree,true);
     // undo topology change
   performNni(tree, nodea, nodeb); 
-  writeNewickTree(stdout, tree,true);
+  //writeNewickTree(stdout, tree,true);
 
 }
 
@@ -131,7 +131,7 @@ void SprProposer::revert(Tree *tree)
 
 
 //=============================================================================
-// Mixuture of Proposers
+// Mixture of Proposers
 
 void MixProposer::addProposer(TopologyProposer *proposer, float weight)
 {
@@ -141,6 +141,7 @@ void MixProposer::addProposer(TopologyProposer *proposer, float weight)
 
 void MixProposer::propose(Tree *tree)
 {
+
     // increase iteration
     iter++;
 
@@ -191,11 +192,10 @@ void SprNbrProposer::propose(Tree *tree)
     }
 
     iter++; // increase iteration
-   //print queue
-    printf("\nthis is our non random queue\n");
+    //printf("\nthis is our non random queue\n");
     list<Node*>::iterator indice=queue.begin();
     for (int i=0; i<queue.size(); i++){
-      printf("\nname of the node %d\n",(*indice)->name);
+      //printf("\nname of the node %d\n",(*indice)->name);
       indice++;
     }
 
@@ -228,11 +228,10 @@ void SprNbrProposer::propose(Tree *tree)
        queue.pop_front();
     }
     //we have now our randomqueue
-
-    printf("\nthis is our random queue\n");
+    
     list<Node*>::iterator indices=randomqueue.begin();
     for (int i=0; i<randomqueue.size(); i++){
-      printf("\nname of the node %d\n",(*indices)->name);
+      //printf("\nname of the node %d\n",(*indices)->name);
       indices++;
     }
 
@@ -425,24 +424,49 @@ void SprNbrProposer::pickNewSubtree()
 
   ///////////////////////////LocalChangeProposer
 
-LocalChangeProposer::LocalChangeProposer(int niter) :
+SubtreeSlideProposer::SubtreeSlideProposer(int niter) :
     NniProposer(niter)
 {
 }
 
 
-void LocalChangeProposer::propose(Tree *tree)
+void SubtreeSlideProposer::propose(Tree *tree)
 {
-  performLocalChange(tree, &m, &mstar);  
+  performSubtreeSlide(tree, &m, &mstar);  
 }
 
 
-float LocalChangeProposer::calcPropRatio(Tree *tree)
+float SubtreeSlideProposer::calcPropRatio(Tree *tree)
 {
-  float result=(mstar/m)*(mstar/m)*(mstar/m);  
-  return result;
+  //printf("\non passe ds le Prop RAtio du subtreeSlide proposer\n");
+  float logratio=3*log(mstar)-3*log(m);  
+  return logratio;
+  
 }
 
+
+
+  ///////////////////////////BranchLengthProposer, it changes only a little bite a random edge of the gene tree
+
+BranchLengthProposer::BranchLengthProposer(int niter) :
+    NniProposer(niter)
+{
+}
+
+void BranchLengthProposer::propose(Tree *tree)
+{
+
+  performBranchLength(tree, &m, &mstar);  
+}
+
+
+float BranchLengthProposer::calcPropRatio(Tree *tree)
+{
+  float logratio=log(mstar)-log(m);  
+  return logratio;
+
+
+}
 
 
 
@@ -538,8 +562,8 @@ void DupLossProposer::propose(Tree *tree)
     labelEvents(tree, recon, events);
     double bestlogp = birthDeathTreePriorFull(tree, stree, recon, events, 
                                               dupprob, lossprob,
-                                              doomtable);
-
+                                              doomtable,0.5);
+    //use default value for the number of leaves at the root fix it later
 
     double sum = -INFINITY;
 
@@ -558,7 +582,10 @@ void DupLossProposer::propose(Tree *tree)
         labelEvents(tree, recon, events);
         double logp = birthDeathTreePriorFull(tree, stree, recon, events, 
                                               dupprob, lossprob,
-                                              doomtable);
+                                              doomtable,0.5);
+	//use default value for the number of leaves at the root fix it later
+
+
         printLog(LOG_HIGH, "search: qiter %d %f %f\n", i, logp, bestlogp);
         
         Tree *tree2 = tree->copy();
@@ -638,8 +665,7 @@ void UniqueProposer::propose(Tree *tree)
             break;
         } else {
             if (i < ntries) {
-                // revert and loop again
-	      printf("on effectue un revert ds Uniqueproposer");
+                // revert and loop again	   
 	      proposer->revert(tree);
             } else {
                 // give up and return tree
@@ -694,7 +720,7 @@ Tree *getInitialTree(string *genes, int nseqs, int seqlen, char **seqs,
 // search logging
 
 
-void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species, int *recon, int *events,FILE *infoduploss)
+void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species, int *recon, int *events, bool keepDupLoss, FILE *infoduploss, FILE *fileduplosslasttree,bool final)
 {
   if (stree) {
     bool cleanupRecon = false;
@@ -709,17 +735,15 @@ void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species, int *r
       cleanupEvents = true;
     }    
 	
-    for (int i=0; i<tree->nnodes; i++) {
-      Node *node = tree->nodes[i];
-      printf("%d\t%s\n", node->name,(node->longname).c_str());
-      printf("its reconciliation is%d\n",recon[i]);
-    }
+    //   for (int i=0; i<tree->nnodes; i++) {
+    // Node *node = tree->nodes[i];
+      //printf("%d\t%s\n", node->name,(node->longname).c_str());
+      //printf("its reconciliation is%d\n",recon[i]);
+    //}
 
     int lossWGD=0;
     int losses = countLoss(tree, stree, recon, events, &lossWGD);
-    printf("we have found %d losses \n",losses);
     printLog(LOG_LOW, "search: loss = %d\n", losses);
-    printf("we have found %d losses at the WGD \n",lossWGD);
     printLog(LOG_LOW, "search: loss at the WGD = %d\n", lossWGD);
 
     // count dups
@@ -733,16 +757,28 @@ void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species, int *r
 	}}
     }
 
-    printf("we have found %d dup \n",dups);
-    printf("we have found %d dup at the WGD \n",dupWGD);
     printLog(LOG_LOW, "search: dups = %d\n", dups);
     printLog(LOG_LOW, "search: dups at the WGD = %d\n", dupWGD);
     
+    if (keepDupLoss){
+    //we keep in a file the losses dupolications ...
     fprintf(infoduploss,"%d",losses);
     fprintf(infoduploss,"%d",lossWGD);
     fprintf(infoduploss,"%d",dups);
     fprintf(infoduploss,"%d",dupWGD);
     fprintf(infoduploss,"\n");
+    }
+
+
+    if (final){
+      //we are at he last step ,ie last tree
+      //we print in a file the losses duplication ......  only for the last tree
+      fprintf(fileduplosslasttree,"%d",losses);
+      fprintf(fileduplosslasttree,"%d",lossWGD);
+      fprintf(fileduplosslasttree,"%d",dups);
+      fprintf(fileduplosslasttree,"%d",dupWGD);
+
+    }
 
         //assert(tree->assertTree());        
         if (cleanupRecon)
@@ -768,49 +804,81 @@ void printLogTree(int loglevel, Tree *tree)
 }
 
 
+//////////////////////////////////////////////////////
+
+
+void printTreeSampled(bool keepTreeSampled, FILE *filetrees, Tree *tree)
+{
+  if (keepTreeSampled){
+     writeNewickTree(filetrees, tree, 0, true);
+    fprintf(filetrees,"\n");
+  }
+
+}
+
+
+
+///////////////////////////////////////////////////////
+
+
+
+
+
+
 class Prob
 {
 public:
-    double seqlk;
-    double branchp;
-    double topp;
-    double logp;
+  double seqlk;
+  double branchp;
+  double topp;
+  double logProbNotExtinct;
+  double logp;
 
-  double calcJoint(Model *model, Tree *tree, double *theseqlik, double *thelogp)
+
+  double calcJoint(SpimapModel *model, Tree *tree)
   {
-        printf("now starting setTree\n");
-	fflush(stdout);
-
+ 	fflush(stdout);
         model->setTree(tree);
-
 	seqlk = model->likelihood();
-	printf("\noh voici seqlklikelihood %f\n",seqlk);
-	*theseqlik=seqlk;
-	printf("\nre voici expseqlklikelihood %f\n",*theseqlik);
-
 	branchp = model->branchPrior();
-
-	printf("Branch Prior finished");
-	fflush(stdout);
-
-	///affichea virer
-	for (int i=0; i<tree->nnodes; i++) {
-	  Node *node = tree->nodes[i];
-	  printf("%d\t%s\n", node->name,(node->longname).c_str());
-	  for (int i=0; i<node->nchildren; i++){
-	    printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
-	  }
-	}
-   //endafficheavirer
-
         topp = model->topologyPrior();
-        logp = seqlk + branchp + topp;
-	*thelogp=logp;
-	printf("sum finished");
+	logp = seqlk + branchp + topp - logProbNotExtinct ;
 	fflush(stdout);
 
         return logp;
     }
+
+  //  double calcJointWithoutTopp(SpimapModel *model, Tree *tree, float logProbNotExtinct)
+  
+  double calcJointWithoutTopp(SpimapModel *model, Tree *tree)
+  { //we don t compute the topology prior
+  
+    model->setTree(tree);
+    seqlk = model->likelihood();
+    branchp = model->branchPrior();
+    logp = seqlk + branchp + topp -  logProbNotExtinct;  
+
+    return logp;
+  }
+
+
+ 
+ 
+  double calcJointWithBranchOptimization(SpimapModel *model, Tree *tree)
+  {  
+    //we don t compute the topology prior
+    //we just optimize the branch length using original algorithm of Matt
+    model->setTree(tree);
+    seqlk = model->likelihoodWithOptimization();
+    branchp = model->branchPrior();
+    logp = seqlk + branchp + topp -  logProbNotExtinct;    
+
+    return logp;
+  }
+
+
+
+
 };
 
 
@@ -820,116 +888,14 @@ void printLogProb(int loglevel, Prob *prob)
     printLog(loglevel, "search: seqlk  = %f\n", prob->seqlk);
     printLog(loglevel, "search: branch = %f\n", prob->branchp);          
     printLog(loglevel, "search: top    = %f\n", prob->topp);
+    printLog(loglevel, "search: logProbNotExtinct = %f\n", prob->logProbNotExtinct);
 }
 
 
-
-//============================================================
-
-
-/*
-
-
-void calcSumForHarmonic(double likseq, double *harmonic1)
-{   
-
-*harmonic1= *harmonic1 + 1/likseq;
-
-}
-
-
-void calcFinalHarmonic(int niter, double *harmonic1)
-{
-  
-  //before
-  // *harmonic1=1/(*harmonic1/niter);
-  //end before
-
-  double result;
-
-  result= -log(90) + log(1/(*harmonic1/niter)) ;
-  
-  *harmonic1=exp(result);
-
-
-}
-
-
-void calcSumForHarmonic4(double likseq, double *sumnumerator, double *sumdenominator)
-{   
-
-  double value=0;
-  double delta=0;
-
-
-  for (int i=1; i<101; ++i){    
-    value += 0.01;
-    sumnumerator[i] +=  likseq/(value*delta + (1-delta)*likseq); 
-    sumdenominator[i] += 1/(value*delta + (1-delta)*likseq);
-
-    //    printf("\nvoici i %d\n",i);
-    // printf("\nvoici sumnumerator %f\n",sumnumerator[10]);
-    //printf("\n o lala voici sumdenominator %f\n",sumdenominator[i]);
-  
-
-
-  }
-
-
-}
-
-
-void calcFinalHarmonic4(int niter, double *harmonic4, double *sumnumerator, 
-double *sumdenominator)
-{
-
-  double value=0;
-  double delta=0.1;
-  double num, denom, diff, olddiff;
-  *harmonic4=3;
-  olddiff=5;
-
-
-  for (int i=1; i<101; ++i){ 
-
-    //  printf("\nvoici i %d\n",i);
-    //printf("\nvoici sumnumerator %f\n",sumnumerator[i]);
-    //printf("\nvoici sumdenominator %f\n",sumdenominator[i]);
-
-    value += 0.01;
-    num=delta*niter/(1-delta) + sumnumerator[i]; 
-    //    denom= delta*niter/(value*(1-delta)) + sumdenominator[i];
-    denom= value*delta*niter/(1-delta) + sumdenominator[i];
-    diff= (value-num/denom)*(value-num/denom);
-
-    // printf("\nvoici diff %f\n",diff);
-
-    if ( min(diff,olddiff)!= olddiff ){
-      *harmonic4=value;
-      olddiff=diff;
-    }
-
-  }
-
-
-}
-
-
-*/
-
-
-
-
-
-
-
-//=============================================================================
-// Search Climb
-
-//TreeSearchClimb::TreeSearchClimb(Model *model, TopologyProposer *proposer) :
-  TreeSearchClimb::TreeSearchClimb(Model *model, MixProposer *proposer) :
+TreeSearchClimb::TreeSearchClimb(SpimapModel *model, MixProposer *proposer, MixProposer *proposer2 ) :
     model(model),
-    proposer(proposer)
+    proposer(proposer),
+    proposer2(proposer2)
 {
 }
 
@@ -939,35 +905,52 @@ TreeSearchClimb::~TreeSearchClimb()
 
 
 Tree *TreeSearchClimb::search(Tree *initTree, string *genes, 
-			      int nseqs, int seqlen, char **seqs, string outputprefix,int method)
+			      int nseqs, int seqlen, char **seqs, string outputprefix, int method, bool keepTreeSampled, bool keepDupLoss)
 {
     Tree *toptree = NULL;
-    double toplogp = -INFINITY, nextlogp;
-    Tree *tree = initTree;
+    double logp = -INFINITY, nextlogp, logpuseless;
+    Tree *tree = NULL;
     Timer correctTimer;    
     Timer proposalTimer;
 
     Prob prob;
-    double theseqlik, theoldseqlik, thelogp, theoldlogp;
+    bool accept;
+    double logPropRatio, logProbNotExtinct, logDoomedAtRoot;
+    //    double q=0.5;//be careful it has to be the same q as in birthTreePrior2, fix it later
 
-    
+    double seqlk =0, branchp =0, topp =0, nextseqlk, nextbranchp, nexttopp;
+    bool final=false;
+
+    SpimapModel *model=getmodel();
+    float q=model->getq();
+
+
+    logDoomedAtRoot=model->getdoomtable()[model->getSpeciesTree()->root->name];
+ 
+    logProbNotExtinct = log(1-exp(logDoomedAtRoot)) -  log(1-(1-q)*exp(logDoomedAtRoot)) ;
+    prob.logProbNotExtinct= logProbNotExtinct;
+
     // setup search debug: testing against know correct tree
     Tree *correct = proposer->getCorrect();
     double correctLogp = -INFINITY;
+
     if (correct) {
         // determine probability of correct tree
         parsimony(correct, nseqs, seqs); // get initial branch lengths
-        correctLogp = prob.calcJoint(model, correct, &theseqlik, &thelogp);
+        correctLogp = prob.calcJoint(model, correct);
         printLog(LOG_LOW, "search: correct tree lnl = %f\n", correctLogp);
     }
 
-
     
     // determine initial tree topology
-    //   if (initTree == NULL)
-    //  tree = getInitialTree(genes, nseqs, seqlen, seqs,
-    //                        model->getSpeciesTree(), 
-    //                        model->getGene2species());
+    if (initTree == NULL)
+	 tree = getInitialTree(genes, nseqs, seqlen, seqs,
+                            model->getSpeciesTree(), 
+                            model->getGene2species());
+
+
+    if (initTree != NULL)
+      tree=initTree->copy();
 
 
     // special cases (1 and 2 leaves)
@@ -978,225 +961,323 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
 
     // calc probability of initial tree
     parsimony(tree, nseqs, seqs); // get initial branch lengths
-    toplogp = prob.calcJoint(model, tree, &theseqlik, &thelogp);
-    theoldseqlik=theseqlik;
-    theoldlogp=thelogp;
+    logp = prob.calcJoint(model, tree);
+    seqlk=prob.seqlk;
+    branchp=prob.branchp;
+    topp=prob.topp;
 
     toptree = tree->copy();
-    
+
+
+
     // log initial tree
     printLog(LOG_LOW, "search: initial\n");
     printLogProb(LOG_LOW, &prob);
     printLogTree(LOG_LOW, tree);
 
-    string outTreeSampledFile = outputprefix  + ".treesampled";
-    FILE *filetrees=fopen(outTreeSampledFile.c_str(), "w");
-    writeNewickTree(filetrees, tree, 0, true);
-    fprintf(filetrees,"\n");
- 
 
-    string outDupLossFile = outputprefix  + ".duploss";
-    FILE *fileduploss=fopen(outDupLossFile.c_str(), "w");
+    FILE *filetrees=NULL;
+    if (keepTreeSampled){
+      string outTreeSampledFile = outputprefix  + ".treesampled";
+      filetrees=fopen(outTreeSampledFile.c_str(), "w");
+    }else{
+      filetrees=NULL;
+    }
 
-    printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
-   
+    printTreeSampled(keepTreeSampled, filetrees, tree);
+
+
+    FILE *fileduploss=NULL;
+    if (keepDupLoss){
+      //we print all the history of the losses , duplication...corresponding to the different trees 
+      string outDupLossFile = outputprefix  + ".duploss";
+      fileduploss=fopen(outDupLossFile.c_str(), "w");
+    }else{
+      fileduploss=NULL;
+    }
+
+
+    //we also  print in a file the losses, duplications... of the last tree
+    string duplosslasttreeFile = outputprefix  + ".duplosslasttree";
+    FILE *fileduplosslasttreeFile=fopen(duplosslasttreeFile.c_str(), "w");  
+
+    printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,keepDupLoss,fileduploss, fileduplosslasttreeFile,final);
+    
+
     int naccept = 0;
     int nreject = 0;
     // search loop
     proposer->reset();
     
-    printf("\non est avt la boucle for\n");
     fflush(stdout);
    
     for (int i=0; proposer->more(); i++) {
-        printLog(LOG_LOW, "search: iter %d\n", i);
+
+
+      printf("iteration  i of propose%d\n",i);
+
+      printLog(LOG_LOW, "first stage :search iter %d\n", i);
     
-        // propose new tree 
-        proposalTimer.start();
-	printf("\non est avt le propose de treesearchclimb\n");
-
-	//avirer apres
-	printf("\noh on est juste avt de changer\n");
-	//	writeNewickTree(stdout, tree,true);
-   
-
-   printf("\n on affiche notre gene tree\n");
-    for (int k=0; k<tree->nnodes; k++) {
-      Node *node = tree->nodes[k];
-      printf("%d\t%s\n", node->name,(node->longname).c_str());
-      for (int j=0; j<node->nchildren; j++){
-	printf("\t%d\t%s\n", node->children[j]->name, (node->children[j]->longname).c_str());
-      }
-    }
-   writeNewickTree(stdout, tree,true);
-	//end eavirer
-
-        proposer->propose(tree);
-	printf("\non est apres le propose de treesearchclimb\n");
-
-	//avirer apres
-  printf("\n on affiche notre gene tree apre le propose\n");
-    for (int k=0; k<tree->nnodes; k++) {
-      Node *node = tree->nodes[k];
-      printf("%d\t%s\n", node->name,(node->longname).c_str());
-      for (int j=0; j<node->nchildren; j++){
-	printf("\t%d\t%s\n", node->children[j]->name, (node->children[j]->longname).c_str());
-      }
-    }
- writeNewickTree(stdout, tree,true);
- //end a virer apres
+      // propose new tree 
+      proposalTimer.start();
+      proposer->propose(tree);
 	
-	printf("\nle voici notre i%d\n",i);
-	fflush(stdout);
-
-	//avirer apres
-	printf("\noh on est juste apres avoir changer\n");
-	//	writeNewickTree(stdout, tree,true);
-	//end eavirer
-
-
-	proposer->testCorrect(tree);
-        proposal_runtime += proposalTimer.time();
+      proposer->testCorrect(tree);
+      proposal_runtime += proposalTimer.time();
         
-        // calculate probability of proposal
-        nextlogp = prob.calcJoint(model, tree, &theseqlik, &thelogp);
+      // calculate probability of proposal
+      nextlogp = prob.calcJoint(model, tree);
+      nextseqlk=prob.seqlk;
+      nextbranchp=prob.branchp;
+      nexttopp=prob.topp;
 
-	//avirer apres
-	printf("\noh on est juste apres avoir calcule le joint\n");
-	fflush(stdout);
-	//	writeNewickTree(stdout, tree,true);
-	//end eavirer
+      accept=0;
+      if (method==1){
+	//MCMC
+	logPropRatio=proposer->calcRatio(tree);
+	accept = ((nextlogp > logp) ||  (frand()<exp(nextlogp-logp+logPropRatio)));
+      }else{
+	  //MAP ie maximum a posteriori
+	accept = (nextlogp > logp);
+      }
+      
 
-	bool accept=0;
+      // log proposal
+      if (accept)
+	printLog(LOG_LOW, "search: accept\n");
+      else
+	printLog(LOG_LOW, "search: reject\n");
+      printLogProb(LOG_LOW, &prob);
+      printLogTree(LOG_LOW, tree);
+
+      // log for search debug
+      if (correct && (nextlogp >= correctLogp || 
+		      tree->sameTopology(correct)))
+        {
+	  printLog(LOG_LOW, "search: correct tree time = %f\n", 
+		   correctTimer.time());
+	  printLog(LOG_LOW, "search: correct tree logl = %f\n", 
+		   correctLogp);
+	  printLog(LOG_LOW, "search: correct tree is best = %d\n",
+		   int(tree->sameTopology(correct)));
+	  printLog(LOG_LOW, "search: correct tree better logl = %f\n", 
+		   nextlogp);
+	  
+	  correct = NULL;
+        }
+
+
+
+      // act on acceptance
+      if (accept) {
+	naccept++;
+	proposer->accept(true);
+	logp = nextlogp;
+	seqlk=nextseqlk;
+	branchp=nextbranchp;
+	topp=nexttopp;
+	    
+	delete toptree;
+	toptree = tree->copy();
+	      	    
+	printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,keepDupLoss,fileduploss,fileduplosslasttreeFile,final);	    
+	printTreeSampled(keepTreeSampled,filetrees,tree);	   
+
+      } else {           
+	// display rejected tree
+	if (isLogLevel(LOG_MEDIUM))
+	  printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,keepDupLoss,fileduploss,fileduplosslasttreeFile, final);
+            	  
+	nreject++;
+	proposer->accept(false); 	     	     
+
+	delete tree;
+	tree=toptree->copy();
+
+	// reject, undo topology change 
+	printTreeSampled(keepTreeSampled,filetrees,tree);
+        
+      }
+
+
+      printLog(LOG_LOW, "\n");
+
+
+      /// SECOND STAGE or THIRD STAGE now at random
+
+      prob.topp=topp;
+
+      //printf("\nwe begin the Branchlength change stage\n");
+
+      if (frand()<0.2){
+	//SECOND STAGE
+	//we propose little changes on the branchs lengths
+
+	for (int k=0; k<(tree->nnodes-1); k++) {
+	  printLog(LOG_LOW, "second stage :search iter %d\n", k);
+	  proposer2->propose(tree);	 
+	  proposer2->testCorrect(tree);
+
+	  //we already have the topology prior
+	  nextlogp = prob.calcJointWithoutTopp(model, tree);
+	  nextseqlk=prob.seqlk;
+	  nextbranchp=prob.branchp;
+	  
+	  accept=0;
+	  if (method==1){
+	  //MCMC
+	    logPropRatio=proposer2->calcRatio(tree);
+	    accept = ((nextlogp > logp) ||  (frand()<exp(nextlogp-logp+logPropRatio)));
+	  }else{
+	  //MAP ie maximum a posteriori
+	    accept = (nextlogp > logp);
+	  }
+	  
+	  // log proposal
+	  if (accept)
+            printLog(LOG_LOW, "search: accept\n");
+	  else
+            printLog(LOG_LOW, "search: reject\n");
+	  printLogProb(LOG_LOW, &prob);
+	  printLogTree(LOG_LOW, tree);
+
+	  // act on acceptance
+	  if (accept) {
+            naccept++;
+	    logp = nextlogp;
+	    seqlk=nextseqlk;
+	    branchp=nextbranchp;
+	    
+            delete toptree;
+
+	    toptree = tree->copy();	   
+	    printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,keepDupLoss,fileduploss,fileduplosslasttreeFile,final);
+	    
+	  }else{	    
+
+	    nreject++;	    	    
+	    delete tree;
+	    tree = toptree->copy();
+	    
+	  }
+
+	}
+	//end SECOND STAGE
+
+      }else{
+
+	/// THIRD STAGE 
+	//we use the optimization of Matt for the branch length
+
+	printLog(LOG_LOW, "third stage :search iter 0\n");
+	proposer2->propose(tree);	 
+	proposer2->testCorrect(tree);
+
+	//we already have the topology prior
+	nextlogp = prob.calcJointWithBranchOptimization(model, tree);
+	nextseqlk=prob.seqlk;
+	nextbranchp=prob.branchp;
+
+	accept=0;
 	if (method==1){
 	  //MCMC
-	float logPropRatio=proposer->calcRatio(tree);
-	printf("\nvoici le logPropRatio%f\n", logPropRatio);
-	accept = ((nextlogp > toplogp) ||  (frand()<exp(nextlogp-toplogp+logPropRatio)));
+	  logPropRatio=proposer2->calcRatio(tree);	
+	  accept = ((nextlogp > logp) ||  (frand()<exp(nextlogp-logp+logPropRatio)));
 	}else{
-	  //ML ie maximum a posteriori
-	 accept = (nextlogp > toplogp);
+	  //MAP ie maximum a posteriori
+	  accept = (nextlogp > logp);
+	}
+	
+	// log proposal
+	if (accept)
+	  printLog(LOG_LOW, "search: accept\n");
+	else
+	  printLog(LOG_LOW, "search: reject\n");
+	printLogProb(LOG_LOW, &prob);
+	printLogTree(LOG_LOW, tree);
+
+	// act on acceptance
+	if (accept) {
+	  naccept++;
+	  logp = nextlogp;
+	  seqlk=nextseqlk;
+	  branchp=nextbranchp;
+	    
+	  delete toptree;	  
+	  toptree = tree->copy();
+	   
+	  printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,keepDupLoss,fileduploss,fileduplosslasttreeFile,final);
+	    
+	}else{	    
+
+	  nreject++;	    
+	  delete tree;
+	  tree = toptree->copy();
+	    
 	}
 
+	//end THIRD STAGE
 
-        // log proposal
-        if (accept)
-            printLog(LOG_LOW, "search: accept\n");
-        else
-            printLog(LOG_LOW, "search: reject\n");
-        printLogProb(LOG_LOW, &prob);
-        printLogTree(LOG_LOW, tree);
+      }
 
-        // log for search debug
-        if (correct && (nextlogp >= correctLogp || 
-                        tree->sameTopology(correct)))
-        {
-            printLog(LOG_LOW, "search: correct tree time = %f\n", 
-                     correctTimer.time());
-            printLog(LOG_LOW, "search: correct tree logl = %f\n", 
-                     correctLogp);
-            printLog(LOG_LOW, "search: correct tree is best = %d\n",
-                     int(tree->sameTopology(correct)));
-            printLog(LOG_LOW, "search: correct tree better logl = %f\n", 
-                     nextlogp);
+      printTreeSampled(keepTreeSampled,filetrees,tree);
 
-            correct = NULL;
-        }
-
-
-        // act on acceptance
-        if (accept) {
-            naccept++;
-            proposer->accept(true);
-            toplogp = nextlogp;
-            delete toptree;
-            toptree = tree->copy();
-	   
-	    //try something
-	    if (theseqlik>theoldseqlik){
-	      theoldseqlik=theseqlik;}
-	    //end try
-
-	    //try something
-	    if (thelogp>theoldlogp){
-	      theoldlogp=thelogp;}
-	    //end try
-
-
-	    printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
-	    
-	    writeNewickTree(filetrees, tree, 0, true);
-	    fprintf(filetrees,"\n");
-
-        } else {           
-            // display rejected tree
-            if (isLogLevel(LOG_MEDIUM))
-	      printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
-            	  
-	      nreject++;
-	      proposer->accept(false); 
- 
-	      //try something
-	      if (theseqlik>theoldseqlik){
-	      theoldseqlik=theseqlik;}
-	      //end try
-
-	      //try something
-	      if (thelogp>theoldlogp){
-	      theoldlogp=thelogp;}
-	      //end try
-
-	      delete tree;
-	      tree=toptree->copy();
-
-	      // reject, undo topology change
-	      writeNewickTree(filetrees, tree, 0, true);
-	      fprintf(filetrees,"\n");
-        
-        }
-
-        printLog(LOG_LOW, "\n");
     }
+
+    ///////////////////////////////////////////////////
     
     // print final log messages
     printLog(LOG_LOW, "accept rate: %f\n", naccept / double(naccept+nreject));
+    logpuseless=prob.calcJointWithoutTopp(model, tree);
 
-    // call probability break down again of top tree
-    prob.calcJoint(model, toptree, &theseqlik, &thelogp);
-    
-    // log final tree
+    //be careful, we already had saved thebest logp and the corresponding seqlk branchp topp 
+    //however we had to run again calcjoint above in order to update model->recon end model->events
+    //which had not been saved 
+    //otherwise we have model->recon and model->events not corresponding to the best tree 
+    //so for the following we take the thing saved
+    // and we take the new model->recon and model->events
+
     printLog(LOG_LOW, "search: final\n");
+
+    prob.seqlk=seqlk;
+    prob.branchp=branchp;
+    prob.topp=topp;
+    prob.logp=logp;
     printLogProb(LOG_LOW, &prob);
+    printLog(LOG_LOW, "double check %f\n", logp);
+    
+    final=true;
+    //in order to write in a file the losses and duplications corresponding to the last tree
+  
+    printSearchStatus(tree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,keepDupLoss,fileduploss,fileduplosslasttreeFile,final);    
 
-    printSearchStatus(toptree, model->getSpeciesTree(), model->getGene2species(), model->recon, model->events,fileduploss);
+    fclose(fileduplosslasttreeFile);
 
+    if (keepTreeSampled){
+      fclose(filetrees);}
 
-    fclose(filetrees);
-    fclose(fileduploss);
+    if (keepDupLoss){
+      fclose(fileduploss);}
 
-    // print the last likelihood of the sequence
-
-    string loglikelihoodseqFile = outputprefix  + ".loglikelihoodseq";
-    FILE *fileloglikelihoodseq=fopen(loglikelihoodseqFile.c_str(), "w");     
-    fprintf(fileloglikelihoodseq,"%e",theoldseqlik);
-    fclose(fileloglikelihoodseq);
-    //
-
-    // print the last likelihood of the sequence
+    // print the full log likelihood in the file 
     string logpFile = outputprefix  + ".completeloglikelihood";
-    FILE *filelogpFile=fopen(logpFile.c_str(), "w");     
-    fprintf(filelogpFile,"%e",theoldlogp);
+    FILE *filelogpFile=fopen(logpFile.c_str(), "w");      
+
+    fprintf(filelogpFile,"%e",prob.logp);
+    
+    // print the probability of the topology  in the file
+    string toppFile = outputprefix  + ".topologyprob";
+    FILE *filetoppFile=fopen(toppFile.c_str(), "w");      
+
+    fprintf(filetoppFile,"%e",prob.topp);
+
     fclose(filelogpFile);
-    //
-
-
-
-    // clean up
-    if (initTree == NULL)
-        delete tree;
-
+    fclose(filetoppFile);
+    
+    delete tree;
     return toptree;
-}
+
+    }
 
 
 /*

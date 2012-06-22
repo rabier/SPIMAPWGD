@@ -68,8 +68,6 @@ public:
     virtual void accept(bool accepted) {}
     virtual float calcPropRatio(Tree *tree){}
 
-
-
     virtual void setCorrect(Tree *tree) { correctTree = tree; }
     virtual Tree *getCorrect() { return correctTree; }
     virtual bool seenCorrect() { return correctSeen; }
@@ -159,10 +157,10 @@ protected:
 };
 
 
-class LocalChangeProposer: public NniProposer
+class SubtreeSlideProposer: public NniProposer
 {
 public:
-    LocalChangeProposer(int niter=500);
+    SubtreeSlideProposer(int niter=500);
     virtual void propose(Tree *tree);
     virtual float calcPropRatio(Tree *tree);
 
@@ -172,6 +170,22 @@ protected:
     float  mstar;
 
 };
+
+
+class BranchLengthProposer: public NniProposer
+{
+public:
+    BranchLengthProposer(int niter=500);
+    virtual void propose(Tree *tree);
+    virtual float calcPropRatio(Tree *tree);
+
+protected:    
+    int niter;
+    float m;
+    float  mstar;
+
+};
+
 
 
 
@@ -321,7 +335,8 @@ public:
         nni(niter),
         spr(niter),
         sprnbr(niter, radius),
-	locchange(niter),
+	slidechange(niter),
+	branchchange(niter),
         mix(niter),
         rooted(&mix, stree, gene2species),
         unique(&rooted, niter),
@@ -337,8 +352,10 @@ public:
 	else if (propid==0){
 	  mix.addProposer(&nni, sprrate);
 	}else{
-	  mix.addProposer(&locchange, sprrate);	  
+	  mix.addProposer(&slidechange, sprrate);	  
 	}
+
+	mix2.addProposer(&branchchange,1);
 
 
     }
@@ -355,20 +372,19 @@ public:
     NniProposer nni;
     SprProposer spr;
     SprNbrProposer sprnbr;
-    LocalChangeProposer locchange;
+    SubtreeSlideProposer slidechange;
+    BranchLengthProposer branchchange;
     MixProposer mix;
 
     ReconRootProposer rooted;
     UniqueProposer unique;
     DupLossProposer dl;
-
     MixProposer mix2;
 };
 
 
 
 //=============================================================================
-
 
 
 class SampleFunc
@@ -419,18 +435,22 @@ class TreeSearchClimb : public TreeSearch
 {
 public:
 
-    TreeSearchClimb(Model *model, MixProposer *proposer);
-    virtual ~TreeSearchClimb();
-    virtual Tree *search(Tree *initTree, 
-			 string *genes, 
-			  int nseqs, int seqlen, char **seqs, string outputprefix, int method);
 
-    Model *getmodel()
-    {return model; }
+  TreeSearchClimb(SpimapModel *model, MixProposer *proposer, MixProposer *proposer2);
+
+  SpimapModel *getmodel()
+  {return model; }
+  
+  virtual ~TreeSearchClimb();
+  virtual Tree *search(Tree *initTree, 
+		       string *genes, 
+		       int nseqs, int seqlen, char **seqs, string outputprefix, int method, bool keepTreeSampled, bool keepDupLoss);
+
 
 protected:
-    Model *model;
+    SpimapModel *model; 
     MixProposer *proposer;
+    MixProposer *proposer2;
 };
 
 
