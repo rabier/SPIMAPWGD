@@ -122,6 +122,9 @@ public:
 		    &lossrate, 0.1,
 		    "probability of loss (default=0.1)"));
 	config.add(new ConfigParam<float>
+		   ("-LR", "--lineagesatroot", "<param for lineages at the root>                     ",&q, 0.5,
+		    "parameter for the geometric law, concerning the number of lineages at the root (default=0.5)"));
+	config.add(new ConfigParam<float>
 		   ("-P", "--pretime", "<pre-speciation time parameter>", 
 		    &pretime, 1.00,
 		    "lambda param of pre-speciation distribution (default=1.0)"));
@@ -143,7 +146,7 @@ public:
         config.add(new ConfigParam<int>
 		   ("-g", "--proposal-gene-topology", "<proposal type for gene tree topology>", 
 		    &propid, 1,
-		    "1 for spr-neighbor (default: 1), 0 for nni, 2 for localchange"));
+		    "1 for spr-neighbor (default: 1), 0 for nni, 2 for SubtreeSlide"));
 	 config.add(new ConfigParam<int>
 		    ("","--mcmc", "<mcmc>", 
 		    &method, 1,
@@ -197,7 +200,14 @@ public:
 	config.add(new ConfigParam<string>
 		   ("", "--log", "<log filename>", &logfile, "", 
 		    "log filename.  Use '-' to display on stdout."));
-
+	config.add(new ConfigSwitch
+		   ("", "--treeSampled", 
+		    &keepTreeSampled,
+		    "Output treeSampled"));
+	config.add(new ConfigSwitch
+		   ("", "--informationduploss", 
+		    &keepDupLoss,
+		    "Output losses, losses at WGD, duplications, duplications at WGD"));
 	config.add(new ConfigSwitch
 		   ("-v", "--version", &version, "display version information"));
 	config.add(new ConfigSwitch
@@ -205,8 +215,7 @@ public:
 		    "display help information"));
 	config.add(new ConfigSwitch
 		   ("", "--help-debug", &help_debug, 
-		    "display help information about debug options"));
-        
+		    "display help information about debug options"));        
     }
 
     int parseArgs(int argc, char **argv)
@@ -258,13 +267,15 @@ public:
     printLog(LOG_LOW, "-k  %f\n", kappa);
     printLog(LOG_LOW, " -f %s\n", bgfreqstr.c_str());
     printLog(LOG_LOW, "-duprate %f\n", duprate);
-    printLog(LOG_LOW, "-lossrate %f\n", lossrate);    
+    printLog(LOG_LOW, "-lossrate %f\n", lossrate);  
+    printLog(LOG_LOW, "--lineagesatroot %f\n", q);
     printLog(LOG_LOW, "-P %f\n", pretime);
+
     printLog(LOG_LOW, "-niter %d\n", niter);
     printLog(LOG_LOW, "-- quickiter %d\n", quickiter);
     printLog(LOG_LOW, "-b %d\n", bootiter);
-    printLog(LOG_LOW, "-g (0 for NNI, 1 for SPR, 2 for LocalChange) %d\n", propid);
-    printLog(LOG_LOW, "--mcmc (1 for MCMC and 0 for ML) %d\n", method);
+    printLog(LOG_LOW, "-g (0 for NNI, 1 for SPR, 2 for SubtreeSlide) %d\n", propid);
+    printLog(LOG_LOW, "--mcmc (1 for MCMC and 0 for MAP) %d\n", method);
     printLog(LOG_LOW, "-x %d\n", seed);
     printLog(LOG_LOW, "comment %s\n", search.c_str());
     printLog(LOG_LOW, "-c %s\n", correctFile.c_str());
@@ -275,6 +286,8 @@ public:
     printLog(LOG_LOW, "--minlen %f\n", minlen);
     printLog(LOG_LOW, "--maxlen %f\n", maxlen);
     printLog(LOG_LOW, "-V %d\n", verbose);
+    printLog(LOG_LOW, "--treeSampled (1 true, 0 false) %d\n", keepTreeSampled);
+    printLog(LOG_LOW, "--informationduploss (1 true, 0 false) %d\n", keepDupLoss);
     printLog(LOG_LOW, "-v %d\n", version);
     printLog(LOG_LOW, "-h %d\n", help);
     printLog(LOG_LOW, "--help-debug %d\n", help_debug);
@@ -302,6 +315,7 @@ public:
     float duprate;
     float lossrate;
     float pretime;
+    float q;
 
     // search
     int niter;
@@ -323,6 +337,8 @@ public:
 
     // help/information
     int verbose;
+    bool keepTreeSampled;
+    bool keepDupLoss;
     bool version;
     bool help;
     bool help_debug;
@@ -619,7 +635,12 @@ int main(int argc, char **argv)
 
     //=====================================================
     // init model
-    Model *model;    
+    //  Model *model;    
+
+
+    //me
+    SpimapModel *model;
+
     
     if (WGDstree->nWGD > 0){
       //we will have  some rates for WGD 
@@ -635,7 +656,7 @@ int main(int argc, char **argv)
                                      c.lossrate,
                                      c.priorSamples,
                                      !c.priorExact,
-                                     true);
+                                     true,c.q);
      printf("done\n");
      printf("now printing species tree\n");
      fflush(stdout);
@@ -668,10 +689,6 @@ int main(int argc, char **argv)
     float sprrate = .5;
 
 
-    printf("\nvoici lid du proposal%d\n",c.propid);
-    printf("\nvoici le nb diter%d\n",c.niter);
-    printf("\nvoici le taux de dup%f\n",c.duprate);
-    //fixit two trees with and without WGD
     DefaultSearch prop(c.niter, c.quickiter,
                        &stree_noWGD, gene2species,
                        c.duprate, c.lossrate,
@@ -679,11 +696,11 @@ int main(int argc, char **argv)
 
 
     MixProposer *proposer = &prop.mix;
+    MixProposer *proposer2 = &prop.mix2;
 
-
-    // init search
-    TreeSearchClimb *search = new TreeSearchClimb(model, proposer);
-
+     // init search
+    TreeSearchClimb *search = new TreeSearchClimb(model, proposer, proposer2);
+ 
 
     auto_ptr<TreeSearch> search_ptr(search);
 
@@ -705,9 +722,11 @@ int main(int argc, char **argv)
     // search
     time_t startTime = time(NULL);
     // here is when the first reconciliation happens
-    
+
     Tree *toptree = search->search(tree, genes, 
-                                   aln->nseqs, aln->seqlen, aln->seqs, c.outprefix, c.method);
+                                   aln->nseqs, aln->seqlen, aln->seqs, c.outprefix, c.method,c.keepTreeSampled,c.keepDupLoss);
+
+    // return 1;
 
     auto_ptr<Tree> toptree_ptr(toptree);
     if (c.bootiter > 1) {
@@ -715,14 +734,15 @@ int main(int argc, char **argv)
 	    return 1;
     }
     
-    	printf("\non a fini les proposition\n");
-	fflush(stdout);
+   
+    fflush(stdout);
 
     //========================================================
     // output final tree
     
     if (isLogLevel(LOG_LOW))
         displayTree(toptree, getLogFile());
+
 
     // output recon
     if (c.outputRecon) {
@@ -739,11 +759,10 @@ int main(int argc, char **argv)
     writeNewickTree(outtreeFilename.c_str(), toptree);
 
 
-
     /////
     printf("now printing species tree\n");
     displayTree(WGDstree, stdout, 0.2);
-     fflush(stdout);
+    fflush(stdout);
 
      for (int i=0; i<WGDstree->nnodes; i++) {
        Node *node = WGDstree->nodes[i];
@@ -756,18 +775,18 @@ int main(int argc, char **argv)
   printf("now printing final gene tree\n");
   displayTree(toptree, stdout,60,2);
   
-for (int i=0; i<toptree->nnodes; i++) {
-       Node *node = toptree->nodes[i];
-       printf("%d\t%s\n", node->name,(node->longname).c_str());
-       for (int i=0; i<node->nchildren; i++){
-	 printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
-       }
-     }
+  for (int i=0; i<toptree->nnodes; i++) {
+    Node *node = toptree->nodes[i];
+    printf("%d\t%s\n", node->name,(node->longname).c_str());
+    for (int i=0; i<node->nchildren; i++){
+      printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
+    }
+  }
 
 
-  
     // log tree correctness
     if (c.correctFile != "") {
+       printf("we areafetr c.correctfile\n");
         if (proposer->seenCorrect()) {
             printLog(LOG_LOW, "SEARCH: correct visited\n");
         } else {
@@ -780,8 +799,9 @@ for (int i=0; i<toptree->nnodes; i++) {
             printLog(LOG_LOW, "RESULT: wrong\n");
         }
     }
-
-        
+   
+  
+    fflush(stdout);
     // log runtime
     time_t runtime = time(NULL) - startTime;
     printLog(LOG_LOW, "seq runtime:\t%f\n", model->seq_runtime);
@@ -792,8 +812,6 @@ for (int i=0; i<toptree->nnodes; i++) {
     printLog(LOG_LOW, "runtime minutes:\t%.1f\n", float(runtime / 60.0));
     printLog(LOG_LOW, "runtime hours:\t%.1f\n", float(runtime / 3600.0));
     closeLogFile();
-   
-
-    return 5;
+    
 }
 
