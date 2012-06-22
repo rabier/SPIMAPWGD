@@ -28,6 +28,8 @@ public:
     SeqLikelihood() {}
     virtual ~SeqLikelihood() {}
     virtual double findLengths(Tree *tree) {return 0.0;}
+    virtual double findLengthsWithOptimization(Tree *tree) {return 0.0;}
+
 };
 
 
@@ -38,6 +40,7 @@ public:
                      float *bgfreq, float tsvratio, int maxiter, 
                      double minlen=0.0001, double maxlen=10.0);
     virtual double findLengths(Tree *tree);
+    virtual double findLengthsWithOptimization(Tree *tree);
 
     int nseqs;
     int seqlen;
@@ -69,6 +72,8 @@ public:
     
     virtual void setTree(Tree *_tree) { tree = _tree; }
     virtual double likelihood() { return 0.0; }
+    virtual double likelihoodWithOptimization() { return 0.0; }
+
     virtual double branchPrior() { return 0.0; }
     virtual double topologyPrior() { return 0.0; }
 
@@ -96,7 +101,7 @@ public:
 		SpidirParams *params, 
 		int *gene2species,
 		float predupprob, float dupprob, float lossprob,
-		int nsample, bool approx, bool useBranchPrior);
+		int nsample, bool approx, bool useBranchPrior, float q);
     //stree_small speciestree without WGD
     //stree speciestree with WGD
     virtual ~SpimapModel();
@@ -104,13 +109,24 @@ public:
     virtual void setTree(Tree *_tree);
     virtual void WGDreconcile(Node *node,int thelastWGD);
     virtual double likelihood();
+    virtual double likelihoodWithOptimization();
+
     virtual double branchPrior();
     virtual double topologyPrior();
     
-    virtual SpeciesTree *getSpeciesTree() { return stree; }
-    virtual int *getGene2species() { return gene2species; }
+    SpeciesTree *getSpeciesTree() { return stree; }
+
+    int *getGene2species() { return gene2species; }
 
     void setLikelihoodFunc(SeqLikelihood *l) { likelihoodFunc = l; }
+    
+    double *getdoomtable(){
+      return doomtable;
+    }
+
+    float getq(){
+      return q;
+    }
     
 protected:
     int nnodes;
@@ -126,6 +142,8 @@ protected:
     bool useBranchPrior;
     double *doomtable;
     SeqLikelihood *likelihoodFunc;
+    float q;
+
 };
 
 

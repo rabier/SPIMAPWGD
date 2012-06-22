@@ -28,7 +28,7 @@ SpimapModel::SpimapModel(
     SpidirParams *params, 
     int *gene2species,
     float predupprob, float dupprob, float lossprob, 
-    int nsamples, bool approx, bool useBranchPrior) :
+    int nsamples, bool approx, bool useBranchPrior, float q) :
     
     Model(nnodes),
     nnodes(nnodes),
@@ -41,7 +41,8 @@ SpimapModel::SpimapModel(
     lossprob(lossprob),
     nsamples(nsamples),
     approx(approx),
-    useBranchPrior(useBranchPrior)
+    useBranchPrior(useBranchPrior),
+    q(q)
 {
     doomtable = new double [stree->nnodes]; 
     calcDoomTable(stree, dupprob, lossprob, doomtable);    
@@ -63,45 +64,11 @@ void SpimapModel::setTree(Tree *_tree)
     spidir::reconcile(tree, stree_noWGD, gene2species, recon_noWGD);
     labelEvents(tree, recon_noWGD, events);
 
-
-    printf("this is the gene tree\n");
-    //fixitdisplay
-    //displayTree(tree,stdout,60,2);
-
-  for (int i=0; i<tree->nnodes; i++) {
-      Node *node = tree->nodes[i];
-      printf("%d\t%s\n", node->name,(node->longname).c_str());
-      for (int i=0; i<node->nchildren; i++){
-	printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
-      }
-    }
-    
-
-
-    printf("first reconciliation ignoring WGD\n");
-
-    printf("tree->nnodes=%d\n",tree->nnodes);
-    printf("size of recon=%d\n",recon.size());
-    printf("size of recon_noWGD=%d\n",recon_noWGD.size());
-    printf("size of events=%d\n", events.size());
-
     for (int j=0; j<tree->nnodes; j++) {
-       recon[j]=recon_noWGD[j];
-       printf("  node j=%d, recon=%d\n",j, recon[j]);
+       recon[j]=recon_noWGD[j];     
      }
 
-     WGDreconcile(tree->root,-1);
-     printf("first reconciliation considering WGD\n");
-
-     for (int j=0; j<tree->nnodes; j++) {
-       printf("  node j=%d, recon=%d\n",j, recon[j]);
-     }
-
-      printf("the events are\n");
-      for (int j=0; j<tree->nnodes; j++) {
-       printf("  node j=%d, event=%d\n",j, events[j]);
-      }
-
+     WGDreconcile(tree->root,-1);    
 
 }
 
@@ -121,7 +88,7 @@ void SpimapModel::setTree(Tree *_tree)
     for (int j=0; j<stree->nWGD; j++) {
 
       if (recon_noWGD[node->name]==stree->theWGD[j]->WGD_after->name){
-
+	
 	dupat=WGDreconcile_onebranch(stree, recon_noWGD, events, stree->theWGD[j]->WGD_after, node, best);
       	WGDreconReset(stree, recon, recon_noWGD, events, stree->theWGD[j]->WGD_after, node, best);
 	lastWGD= stree->theWGD[j]->WGD_after->name;
@@ -133,11 +100,67 @@ void SpimapModel::setTree(Tree *_tree)
   }
 
   for (int k=0; k<node->nchildren; k++) {
-  WGDreconcile(node->children[k], lastWGD);
+    WGDreconcile(node->children[k], lastWGD);
+  }
+
+  
+}
+
+
+  /*
+  /////////////////////////////////////try to propose a new reconciliation for the WGD (ie note the most parsimonious)
+//call the function WGDReconcileBottom(tree->root) 
+
+
+
+  void SpimapModel::WGDReconcileBottom(Node *node) 
+{
+
+
+   for (int j=0; j<stree->nWGD; j++) {
+
+     if ((recon[node->name] == stree->theWGD[j]->WGD_before->name)|| (recon[node->name] == stree->theWGD[j]->WGD_at->name))
+       {
+	recon[node->name]= stree->theWGD[j]->WGD_after->name;
+       }
+
+   }
+   
+
+  for (int k=0; k<node->nchildren; k++) {
+  WGDReconcileBottom(node->children[k]);
   }
 
 
 }
+
+
+  void SpimapModel::WGDReconcileMiddle(Node *node) 
+{
+
+ for (int j=0; j<stree->nWGD; j++) {
+
+   if ((recon[node->name] == stree->theWGD[j]->WGD_after->name) && (events[node->name] ==EVENT_DUP)  )
+       {
+	 recon[node->name]= stree->theWGD[j]->WGD_at->name;
+       }
+ }
+
+
+ for (int k=0; k<node->nchildren; k++) {
+   WGDReconcileBottom(node->children[k]);
+ }
+
+
+}
+
+  getSpecSubtree(node, schild, recon, events, subleaves);
+
+
+
+  ///////end try new reconciliation
+
+  */
 
 
 
@@ -151,6 +174,22 @@ double SpimapModel::likelihood()
     }
     return logp;
 }
+
+
+
+double SpimapModel::likelihoodWithOptimization()
+{
+    double logp = 0.0;
+    if (likelihoodFunc) {
+        Timer timer;
+        logp = likelihoodFunc->findLengthsWithOptimization(tree);
+        seq_runtime += timer.time();
+    }
+    return logp;
+}
+
+
+
 
 double SpimapModel::branchPrior()
 {
@@ -173,10 +212,10 @@ double SpimapModel::topologyPrior()
 {
     Timer timer;
 
-    printf("just before Treepriorfull");
+    //printf("just before Treepriorfull");
 	fflush(stdout);
     double logp = birthDeathTreePriorFull(tree, stree, recon, events, 
-    dupprob, lossprob, doomtable);
+					  dupprob, lossprob, doomtable,q);
 
     top_runtime += timer.time();
     return logp;
@@ -203,20 +242,29 @@ HkySeqLikelihood::HkySeqLikelihood(int nseqs, int seqlen, char **seqs,
 double HkySeqLikelihood::findLengths(Tree *tree)
 { 
 
-  //version mat
-  //    return findMLBranchLengthsHky(tree, nseqs, seqs, bgfreq, 
-  //				  tsvratio, maxiter, minlen, maxlen);
-  //end version mat
 
-  //version Rabier
   //we only want the likelihood of the sequences given our tree 
   //no ML to find the branch lengths
-      return  calcSeqProbHky(tree,nseqs,seqs, 
-    		       bgfreq,tsvratio);
-//end version Rabier
+     return  calcSeqProbHky(tree,nseqs,seqs, 
+     		       bgfreq,tsvratio);
+
 
 
 }
+
+
+
+double HkySeqLikelihood::findLengthsWithOptimization(Tree *tree)
+{ 
+
+
+     return findMLBranchLengthsHky(tree, nseqs, seqs, bgfreq, 
+  				  tsvratio, maxiter, minlen, maxlen);
+
+
+
+}
+
 
 
 
