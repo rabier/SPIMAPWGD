@@ -81,7 +81,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 
 
 
-//==========================================LOCAL CHANGE LARGET SIMON
+//========================================== SubtreeSlide is the LOCAL CHANGE of LARGET and SIMON
 
 /*      noded
           \
@@ -96,22 +96,27 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 
 
 
-//void performLocalChange(Tree *tree)
-  void performLocalChange(Tree *tree, float *mratio, float *mstarratio)
+  void performSubtreeSlide(Tree *tree, float *mratio, float *mstarratio)
 {
 
-  printf("\n on arrive ds le localchange\n");
+
+  //////////////////////////////////////////////
+  printf("\n on arrive ds le SubtreeSlide\n");
+  
+  ////////////////////
+
   fflush(stdout);
   
   // find an  edge such as 
   //the nodes must not be leaves
   //but a node of the edge can be the root
   int choice;
+ 
   do {
     choice = irand(tree->nnodes);
   } while (tree->nodes[choice]->isLeaf() || 
 	   tree->nodes[choice]->parent == NULL) ;
-    
+
   Node *node1 = tree->nodes[choice];
   Node *node2 = tree->nodes[choice]->parent;    
   Node  *nodec =(node2->children[0] == node1) ? node2->children[1] :
@@ -126,9 +131,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
   Node  *nodeb =(node1->children[0] == nodea) ? node1->children[1] :
                                  node1->children[0];
   float u1=frand();
-  //fix it later, find a value for lambda
-  float lambda=0.3;
-  //end fixit 
+  float lambda=0.2;
   float u2=frand();
   float x,y,xstar,ystar;
 
@@ -139,13 +142,11 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
     float m = nodea->dist + node1->dist + nodec->dist;
     //m is the distance nodea nodec
     *mratio=m;
-
-
     float mstar=m*exp(lambda*(u1-0.5));
     *mstarratio=mstar;
     x=nodea->dist;
     y=nodea->dist+node1->dist;    
-
+    
     if (frand()<0.5){
       // node2  does not move
       //ie node1 moves
@@ -168,7 +169,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 	}else{
 	  node1->children[0]=nodec;
 	}
-
+	
 	if (node2->children[0]==node1){
 	  node2->children[1]=nodea;
 	}else{
@@ -226,7 +227,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 
     //noded is the other extremity for the local change
     printf("\ncase 2\n");
-    printf("\n cas 2\n");
+    //printf("\n cas 2\n");
     float m = nodea->dist + node1->dist + node2->dist;
     //m is the distance nodea noded
     *mratio=m;
@@ -234,7 +235,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
     *mstarratio=mstar;
     x=nodea->dist;
     y=nodea->dist+node1->dist;
-
+    
     if (frand()<0.5){
       // node2  does not move
       //ie node 1 moves      
@@ -249,51 +250,69 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 	node1->dist=ystar-xstar;
 	node2->dist=mstar-ystar;
       }else{
-	//topology changes
-	printf("\n cas topochanges\n");
-	printf("\n cas 212\n");
-	fflush(stdout);
 
-	if (node2->children[0]==nodec){
-	  node2->children[1]=nodea;
+	if (node2->parent==NULL){
+	  //topology can not change
+	  //just change the length 
+	  
+	  do{
+	    mstar=m*exp(lambda*(frand()-0.5));
+	    xstar=frand()*mstar;
+	    ystar=mstar;} while (xstar>ystar);
+	  
+	  nodea->dist=xstar;
+	  node1->dist=ystar-xstar;
+	  
 	}else{
-	  node2->children[0]=nodea;
-	} 
+	  //topology changes
+	  printf("\n cas topochanges\n");
+	  printf("\n cas 212\n");
+	  
+	  printf("\nvoicile nomdenoded %d\n",noded->name);
+	  printf("\nvoicile\n");
+	  fflush(stdout);
+	  
+	  if (node2->children[0]==nodec){
+	    node2->children[1]=nodea;
+	  }else{
+	    node2->children[0]=nodea;
+	  } 
 
-	nodea->parent=node2;
+	  nodea->parent=node2;
 
-	if (node1->children[0]==nodeb){
-	  node1->children[1]=node2;
-	}else{
-	  node1->children[0]=node2;
-	} 
+	  if (node1->children[0]==nodeb){
+	    node1->children[1]=node2;
+	  }else{
+	    node1->children[0]=node2;
+	  } 
+	   
+	  node2->parent=node1;
+	  if (noded->children[0]==node2){
+	    noded->children[0]=node1;
+	  }else{
+	    noded->children[1]=node1;
+	  } 
 
-	node2->parent=node1;
-	if (noded->children[0]==node2){
-	  noded->children[0]=node1;
-	}else{
-	  noded->children[1]=node1;
-	} 
-
-	node1->parent=noded;
-	nodea->dist=ystar;
-	node2->dist=xstar-ystar;
-	node1->dist=mstar-xstar;
+	  node1->parent=noded;
+	  nodea->dist=ystar;
+	  node2->dist=xstar-ystar;
+	  node1->dist=mstar-xstar;
+	}
       }
+
 
     }else{
       //node1 does not move
       //ie node 2 moves
       printf("\n cas 22\n");
       //node2 has to have a parent otherwise it is not possible
-      //so, in case node2 does not have any parent , we perform localchange again
+      //so, in case node2 does not have any parent , we perform subtreeslide  again
       printf("\n cas node1 bouge pas\n");
       if (node2->parent==NULL){
-	//	performLocalChange(tree);
-	performLocalChange(tree,mratio,mstarratio);
+	performSubtreeSlide(tree,mratio,mstarratio);
       }else{
-
-	printf("\n nod2parent\n");
+	
+	//printf("\n nod2parent\n");
 	ystar=u2*mstar;
 	xstar=x*mstar/m;
 	
@@ -307,9 +326,8 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 	}else{
 	  //topology changes
 	  printf("\n cas 222\n");
-	  printf("\n edberg\n");
 	  printf("\nvoicile nomdenoded %d\n",noded->name);
-	 
+	  
 	  if (node2->children[0]==nodec){
 	    node2->children[1]=nodea;
 	  }else{
@@ -337,11 +355,34 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
       }
     }
   }
-
-
-
+  
 }
 
+
+  //======================================================================
+  //Change just a little bite the length of one edge of the tree
+
+ void performBranchLength(Tree *tree, float *mratio, float *mstarratio)
+{
+  // find a node which is not the leaf
+  //we will change the length of the edge above this node
+
+  int choice;
+  do {
+    choice = irand(tree->nnodes);   
+  } while (tree->nodes[choice]->parent == NULL) ;
+       
+  Node *node1 = tree->nodes[choice];
+  float lambda=0.2;
+  float u1=frand();
+  float m = node1->dist ;
+  float mstar=m*exp(lambda*(u1-0.5));
+  node1->dist = mstar;
+
+  *mratio=m;
+  *mstarratio=mstar;
+  
+}
 
 
 //=============================================================================
@@ -394,9 +435,6 @@ void performSpr(Tree *tree, Node *subtree, Node *newpos)
     c->children[bi] = e;
     f->children[ci] = b;
     b->parent = f;
-    //    b->dist += c->dist;
-    //e->dist /= 2.0;
-    //    c->dist = e->dist;
     c->parent = d;
     e->parent = c;
 }
