@@ -20,7 +20,7 @@ double numTopologyHistories(Tree *tree);
 
 double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon, 
                           int *events, float birth, float death,
-                          double *doomtable);
+			    double *doomtable, float q);
 
 
 }

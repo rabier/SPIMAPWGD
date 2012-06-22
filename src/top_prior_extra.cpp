@@ -9,7 +9,6 @@
 #include "phylogeny.h"
 #include "top_prior.h"
 #include "Tree.h"
-// maybe remove treevis
 #include "treevis.h"
 //
 
@@ -455,12 +454,11 @@ void getHashIds(Tree *tree, int *recon, int *hashids)
 
 
 
-
-// TODO: does not handle branches above the species tree root yet
+     
 // NOTE: assumes binary species tree
 double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon, 
                             int *events, float birthRate, float deathRate,
-                            double *doomtable)
+                            double *doomtable, float q)
 {
 
   const double l = birthRate;
@@ -473,26 +471,52 @@ double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon,
   ExtendArray<int> hashids(tree->nnodes);
   getHashIds(tree, recon, hashids);
   double nhist, thist;
+  
+  //const float q=0.5;//it means that in mean we have 2 genes at the root
+
+  ///DEAL with with branches above the species tree root
 
   // preroot duplications
 
-  if (events[tree->root->name] == EVENT_DUP){
-      subleaves.clear();
-      getSpecSubtree(tree->root, stree->nodes[recon[tree->root->name]], recon, events, subleaves);
-      
-      nhist = numSubtopologyHistories(tree, tree->root, subleaves);
-      thist = numHistories(subleaves.size());
-      printf("le nb de feuilles est %d\n",subleaves.size());
-      // correct subtrees 
-      nhist *= exp(numRedundantTopologies(tree, tree->root, 
-					  subleaves, 
-					  hashids,
-					  false));
-      
-      prob += log(nhist) - log(thist);
-      // prob -= log(100);
-      //improper prior on the number of subleaves at the root 
+  if (events[tree->root->name] == EVENT_SPEC){
+    subleaves.clear();
+    const double dc = exp(doomtable[stree->root->name]);
+   
+    // printf("\nvoici  ledoom racine %f\n",exp(doomtable[stree->root->name]));    
+    //    prob+= log(q) -2*log(1-q) -2*dc;
+
+    prob+= log(q) -2*log(1-(1-q)*dc);
+
   }
+
+
+  if (events[tree->root->name] == EVENT_DUP){
+    subleaves.clear();
+    const double dc = exp(doomtable[stree->root->name]);
+    
+    getSpecSubtree(tree->root, stree->nodes[recon[tree->root->name]], recon, events, subleaves);
+    
+    nhist = numSubtopologyHistories(tree, tree->root, subleaves);
+    thist = numHistories(subleaves.size());
+
+    // correct subtrees 
+    nhist *= exp(numRedundantTopologies(tree, tree->root, 
+					subleaves, 
+					hashids,
+					false));
+      
+    prob += log(nhist) - log(thist);
+    // prob -= log(100);
+    //improper prior on the number of subleaves at the root     
+
+    //printf("\nvoici  ledoom racine %f\n",exp(doomtable[stree->root->name]));    
+   
+    //    prob+= log(q) -2*log(1-q) -(subleaves.size()+1)*log(dc);
+    prob+= log(q) + (subleaves.size()-1)*log(1-q) -(subleaves.size()+1)*log(1-(1-q)*dc);
+
+  }
+
+  ///DEAL with BRANCHES after the root of the species  
 
   // loop through speciation nodes in tree
   for (int i=0; i<tree->nnodes; i++) {
