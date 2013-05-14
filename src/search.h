@@ -66,7 +66,7 @@ public:
     virtual bool more() { return false; }
     virtual void reset() {}
     virtual void accept(bool accepted) {}
-    virtual float calcPropRatio(Tree *tree){}
+    virtual float calcPropRatio(Tree *tree){return 1;}
 
     virtual void setCorrect(Tree *tree) { correctTree = tree; }
     virtual Tree *getCorrect() { return correctTree; }
@@ -83,7 +83,7 @@ public:
 protected:
     Tree *correctTree;
     bool correctSeen;
-};
+}; 
 
 
 
@@ -286,6 +286,8 @@ protected:
     float dupprob;
     float lossprob;
     double *doomtable;
+    double *doomrootleft;
+    double *doomrootright;
     TreeSet uniques;
 
     ExtendArray<int> recon;
@@ -444,7 +446,7 @@ public:
   virtual ~TreeSearchClimb();
   virtual Tree *search(Tree *initTree, 
 		       string *genes, 
-		       int nseqs, int seqlen, char **seqs, string outputprefix, int method, bool keepTreeSampled, bool keepDupLoss);
+		       int nseqs, int seqlen, char **seqs, string outputprefix, int method, bool keepTreeSampled, bool keepDupLoss, int observingsomething);
 
 
 protected:

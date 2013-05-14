@@ -1,10 +1,9 @@
 /*=============================================================================
 
   Rabier Charles-Elie
-  Copyright 2007-2011
+  Copyright 2011-2013
 
-  Newick tree reading/writing
-
+functions useful for WGD  
 =============================================================================*/
 
 // c++ headers
@@ -46,7 +45,7 @@ int nodeNameCmpWGD(const void *_a, const void *_b)
 
 
 // function to remove WGDnodes in order to obtain a normal tree
-//this function do two things
+//this function does two things
 //first it gives the WGD nodes the largest node names
 //then it return the new WGD tree
 // and also the tree without WGD (modify argument tree)  
@@ -55,7 +54,7 @@ int nodeNameCmpWGD(const void *_a, const void *_b)
 
 SpeciesTree *removeWGDnodes(SpeciesTree *tree)
 {
-  //we give the biggest node names for the WGD nodes
+  //we give the largest node names for the WGD nodes
   qsort((void*) tree->nodes.get(), tree->nodes.size(), 
 	sizeof(Node*), nodeNameCmpWGD);
  
@@ -112,7 +111,7 @@ SpeciesTree *removeWGDnodes(SpeciesTree *tree)
     parent->children[j]=after;
   }
 
-  // the WGD nodes have the biggest indices
+  // the WGD nodes have the largest indices
   for (int i=tree->nnodes; i>tree->nnodes-2*tree->nWGD; i--) {  
     tree->nodes.pop();
   }
@@ -130,7 +129,7 @@ SpeciesTree *removeWGDnodes(SpeciesTree *tree)
 //assumes that in the WGDtree, all the nodes WGD_before and WGD_at
 //have a name larger than the other nodes
 
-//function which extend params which contained rates only for nodes which were not WGDnodes 
+//function which extends params which contained rates only for nodes which were not WGDnodes 
 //if smik is a node with a WGD just above
 //we keep the same rate (for WGD-at and WGD-before) as the one for smik read in the file .params
 
@@ -165,7 +164,6 @@ int  WGDreconcile_onebranch(SpeciesTree *WGDstree,  int *recon_noWGD, int *event
     // node is  a pseudoLeaf
     best[node->name]=AFTER;
     dup_at=0;
-    //losses_at=1;
   }else
     {//node is not a pseudoleaf
       
@@ -206,14 +204,12 @@ return dup_at;
     if (best[node->name]==AT){
       //reconciliation with the node WGDat
       recon[node->name]=nodeWGDafter->parent->name;
-      // events[node->name]= EVENT_DUP;
     }
 
     if (best[node->name]==BEFORE){ 
 
       //reconciliation with the node WGDbefore
       recon[node->name]=nodeWGDafter->parent->parent->name;
-      //events[node->name]= EVENT_DUP;
       WGDreconReset(WGDstree, recon, recon_noWGD, events, nodeWGDafter, node->children[0], best);
       WGDreconReset(WGDstree, recon, recon_noWGD, events, nodeWGDafter, node->children[1], best);
       

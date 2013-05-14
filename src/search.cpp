@@ -5,6 +5,9 @@
 
   Gene tree search functions
 
+   modified for WGD by Charles-Elie Rabier
+    2011-2013
+
 =============================================================================*/
 
 
@@ -81,6 +84,7 @@ NniProposer::NniProposer(int niter) :
 
 void NniProposer::propose(Tree *tree)
 {
+ 
     // increase iteration
     iter++;
     // propose new tree
@@ -129,7 +133,7 @@ void SprProposer::revert(Tree *tree)
     performSpr(tree, nodea, nodec);
 }
 
-
+ 
 //=============================================================================
 // Mixture of Proposers
 
@@ -194,7 +198,7 @@ void SprNbrProposer::propose(Tree *tree)
     iter++; // increase iteration
     //printf("\nthis is our non random queue\n");
     list<Node*>::iterator indice=queue.begin();
-    for (int i=0; i<queue.size(); i++){
+    for (unsigned int i=0; i<queue.size(); i++){      
       //printf("\nname of the node %d\n",(*indice)->name);
       indice++;
     }
@@ -230,7 +234,7 @@ void SprNbrProposer::propose(Tree *tree)
     //we have now our randomqueue
     
     list<Node*>::iterator indices=randomqueue.begin();
-    for (int i=0; i<randomqueue.size(); i++){
+    for (unsigned int i=0; i<randomqueue.size(); i++){
       //printf("\nname of the node %d\n",(*indices)->name);
       indices++;
     }
@@ -438,7 +442,6 @@ void SubtreeSlideProposer::propose(Tree *tree)
 
 float SubtreeSlideProposer::calcPropRatio(Tree *tree)
 {
-  //printf("\non passe ds le Prop RAtio du subtreeSlide proposer\n");
   float logratio=3*log(mstar)-3*log(m);  
   return logratio;
   
@@ -525,14 +528,18 @@ DupLossProposer::DupLossProposer(TopologyProposer *proposer,
     oldtop(NULL)
 {
     doomtable = new double [stree->nnodes];
-    calcDoomTable(stree, dupprob, lossprob, doomtable);
+    doomrootleft= new double;
+    doomrootright= new double;
+    calcDoomTable(stree, dupprob, lossprob, doomtable, doomrootleft, doomrootright);
 
 }
 
 
 DupLossProposer::~DupLossProposer()
 {
-    delete [] doomtable;
+  delete doomrootleft;
+  delete doomrootright;
+  delete [] doomtable;
 }
 
 
@@ -735,12 +742,7 @@ void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species, int *r
       cleanupEvents = true;
     }    
 	
-    //   for (int i=0; i<tree->nnodes; i++) {
-    // Node *node = tree->nodes[i];
-      //printf("%d\t%s\n", node->name,(node->longname).c_str());
-      //printf("its reconciliation is%d\n",recon[i]);
-    //}
-
+   
     int lossWGD=0;
     int losses = countLoss(tree, stree, recon, events, &lossWGD);
     printLog(LOG_LOW, "search: loss = %d\n", losses);
@@ -773,9 +775,9 @@ void printSearchStatus(Tree *tree, SpeciesTree *stree, int *gene2species, int *r
     if (final){
       //we are at he last step ,ie last tree
       //we print in a file the losses duplication ......  only for the last tree
-      fprintf(fileduplosslasttree,"%d",losses);
-      fprintf(fileduplosslasttree,"%d",lossWGD);
-      fprintf(fileduplosslasttree,"%d",dups);
+      fprintf(fileduplosslasttree,"%d,",losses);
+      fprintf(fileduplosslasttree,"%d,",lossWGD);
+      fprintf(fileduplosslasttree,"%d,",dups);
       fprintf(fileduplosslasttree,"%d",dupWGD);
 
     }
@@ -848,7 +850,6 @@ public:
         return logp;
     }
 
-  //  double calcJointWithoutTopp(SpimapModel *model, Tree *tree, float logProbNotExtinct)
   
   double calcJointWithoutTopp(SpimapModel *model, Tree *tree)
   { //we don t compute the topology prior
@@ -867,7 +868,7 @@ public:
   double calcJointWithBranchOptimization(SpimapModel *model, Tree *tree)
   {  
     //we don t compute the topology prior
-    //we just optimize the branch length using original algorithm of Matt
+    //we just optimize the branch length using the original algorithm of Matt
     model->setTree(tree);
     seqlk = model->likelihoodWithOptimization();
     branchp = model->branchPrior();
@@ -905,8 +906,9 @@ TreeSearchClimb::~TreeSearchClimb()
 
 
 Tree *TreeSearchClimb::search(Tree *initTree, string *genes, 
-			      int nseqs, int seqlen, char **seqs, string outputprefix, int method, bool keepTreeSampled, bool keepDupLoss)
+			      int nseqs, int seqlen, char **seqs, string outputprefix, int method, bool keepTreeSampled, bool keepDupLoss, int observingsomething)
 {
+
     Tree *toptree = NULL;
     double logp = -INFINITY, nextlogp, logpuseless;
     Tree *tree = NULL;
@@ -924,11 +926,28 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     SpimapModel *model=getmodel();
     float q=model->getq();
 
+    
 
     logDoomedAtRoot=model->getdoomtable()[model->getSpeciesTree()->root->name];
- 
-    logProbNotExtinct = log(1-exp(logDoomedAtRoot)) -  log(1-(1-q)*exp(logDoomedAtRoot)) ;
-    prob.logProbNotExtinct= logProbNotExtinct;
+
+    if (observingsomething==1){
+      //we condition on observing something
+      logProbNotExtinct = log(1-exp(logDoomedAtRoot)) -  log(1-(1-q)*exp(logDoomedAtRoot)) ;
+      prob.logProbNotExtinct= logProbNotExtinct;
+     
+    }else{
+      //we condition on having at least on gene on the left side of the species tree
+      //and at least one gene on the right side of the species tree
+      double logDoomedAtRootLeft, logDoomedAtRootRight;
+      logDoomedAtRootLeft=*(model->getdoomrootleft());
+      logDoomedAtRootRight=*(model->getdoomrootright());
+      
+      prob.logProbNotExtinct= log( 1 - (q*exp(logDoomedAtRootLeft))/(1-(1-q)*exp(logDoomedAtRootLeft))  - (q*exp(logDoomedAtRootRight))/(1-(1-q)*exp(logDoomedAtRootRight)) + q*exp(logDoomedAtRoot)/(1-(1-q)*exp(logDoomedAtRoot)) );
+     
+
+    }
+
+
 
     // setup search debug: testing against know correct tree
     Tree *correct = proposer->getCorrect();
@@ -1012,9 +1031,6 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
     fflush(stdout);
    
     for (int i=0; proposer->more(); i++) {
-
-
-      printf("iteration  i of propose%d\n",i);
 
       printLog(LOG_LOW, "first stage :search iter %d\n", i);
     
@@ -1107,11 +1123,9 @@ Tree *TreeSearchClimb::search(Tree *initTree, string *genes,
 
       prob.topp=topp;
 
-      //printf("\nwe begin the Branchlength change stage\n");
-
       if (frand()<0.2){
 	//SECOND STAGE
-	//we propose little changes on the branchs lengths
+	//we propose little changes on branch lengths
 
 	for (int k=0; k<(tree->nnodes-1); k++) {
 	  printLog(LOG_LOW, "second stage :search iter %d\n", k);

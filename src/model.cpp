@@ -45,7 +45,9 @@ SpimapModel::SpimapModel(
     q(q)
 {
     doomtable = new double [stree->nnodes]; 
-    calcDoomTable(stree, dupprob, lossprob, doomtable);    
+    doomrootleft=new double;
+    doomrootright=new double;
+    calcDoomTable(stree, dupprob, lossprob, doomtable, doomrootleft, doomrootright);    
 
 }
 
@@ -53,6 +55,8 @@ SpimapModel::SpimapModel(
 SpimapModel::~SpimapModel()
 {
     delete [] doomtable;
+    delete doomrootleft;
+    delete doomrootright;
 
     if (likelihoodFunc)
         delete likelihoodFunc;
@@ -107,61 +111,6 @@ void SpimapModel::setTree(Tree *_tree)
 }
 
 
-  /*
-  /////////////////////////////////////try to propose a new reconciliation for the WGD (ie note the most parsimonious)
-//call the function WGDReconcileBottom(tree->root) 
-
-
-
-  void SpimapModel::WGDReconcileBottom(Node *node) 
-{
-
-
-   for (int j=0; j<stree->nWGD; j++) {
-
-     if ((recon[node->name] == stree->theWGD[j]->WGD_before->name)|| (recon[node->name] == stree->theWGD[j]->WGD_at->name))
-       {
-	recon[node->name]= stree->theWGD[j]->WGD_after->name;
-       }
-
-   }
-   
-
-  for (int k=0; k<node->nchildren; k++) {
-  WGDReconcileBottom(node->children[k]);
-  }
-
-
-}
-
-
-  void SpimapModel::WGDReconcileMiddle(Node *node) 
-{
-
- for (int j=0; j<stree->nWGD; j++) {
-
-   if ((recon[node->name] == stree->theWGD[j]->WGD_after->name) && (events[node->name] ==EVENT_DUP)  )
-       {
-	 recon[node->name]= stree->theWGD[j]->WGD_at->name;
-       }
- }
-
-
- for (int k=0; k<node->nchildren; k++) {
-   WGDReconcileBottom(node->children[k]);
- }
-
-
-}
-
-  getSpecSubtree(node, schild, recon, events, subleaves);
-
-
-
-  ///////end try new reconciliation
-
-  */
-
 
 
 double SpimapModel::likelihood()
@@ -211,9 +160,6 @@ double SpimapModel::branchPrior()
 double SpimapModel::topologyPrior()
 {
     Timer timer;
-
-    //printf("just before Treepriorfull");
-	fflush(stdout);
     double logp = birthDeathTreePriorFull(tree, stree, recon, events, 
 					  dupprob, lossprob, doomtable,q);
 

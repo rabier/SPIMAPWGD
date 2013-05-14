@@ -247,7 +247,7 @@ extern "C" {
 void parsimony(int nnodes, int *ptree, int nseqs, char **seqs, 
                float *dists, bool buildAncestral, char **ancetralSeqs)
 {
-    int seqlen = strlen(seqs[0]);
+  //int seqlen = strlen(seqs[0]);
     
     // check seqs
     //assert(checkSequences(nseqs, seqlen, seqs));

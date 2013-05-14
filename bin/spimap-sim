@@ -1,4 +1,4 @@
-#/s/python-2.7.1/lib/python2.7/
+#!/usr/bin/env python
 #
 # SPIMAP
 # Matt Rasmussen 2010-2011

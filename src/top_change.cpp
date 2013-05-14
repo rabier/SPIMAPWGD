@@ -5,6 +5,8 @@
 
   Gene tree search functions
 
+   modified for WGD by Charles-Elie Rabier
+    2011-2013
 =============================================================================*/
 
 #include "common.h"
@@ -99,14 +101,6 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
   void performSubtreeSlide(Tree *tree, float *mratio, float *mstarratio)
 {
 
-
-  //////////////////////////////////////////////
-  printf("\n on arrive ds le SubtreeSlide\n");
-  
-  ////////////////////
-
-  fflush(stdout);
-  
   // find an  edge such as 
   //the nodes must not be leaves
   //but a node of the edge can be the root
@@ -117,6 +111,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
   } while (tree->nodes[choice]->isLeaf() || 
 	   tree->nodes[choice]->parent == NULL) ;
 
+  
   Node *node1 = tree->nodes[choice];
   Node *node2 = tree->nodes[choice]->parent;    
   Node  *nodec =(node2->children[0] == node1) ? node2->children[1] :
@@ -138,8 +133,8 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
   if (frand()<0.5){
 
     //nodec is the other extremity for the local change        
-    printf("\n cas 1 nodec fixe\n");
     float m = nodea->dist + node1->dist + nodec->dist;
+
     //m is the distance nodea nodec
     *mratio=m;
     float mstar=m*exp(lambda*(u1-0.5));
@@ -150,20 +145,16 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
     if (frand()<0.5){
       // node2  does not move
       //ie node1 moves
-      printf("\n cas 11\n");
-      printf("\n cas noded fixe 1\n");
       xstar=u2*mstar;
       ystar=y*mstar/m;
       
       if (xstar<ystar){
 	//topology does not change
-	printf("\n cas 111\n");
 	nodea->dist=xstar;
 	node1->dist=ystar-xstar;
 	nodec->dist=mstar-ystar;
       }else{
 	//topology changes
-	printf("\n cas 112\n");
 	if (node1->children[0]==nodeb){
 	  node1->children[1]=nodec;
 	}else{
@@ -186,20 +177,16 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
     }else{
       //node1 does not move
       //node2 moves
-      printf("\n cas 12\n");
-      printf("\n cas nodeb fixe\n");
       ystar=u2*mstar;
       xstar=x*mstar/m;
 	
       if (xstar<ystar){
-	printf("\n cas 121\n");
 	//topology does not change
 	nodea->dist=xstar;
 	node1->dist=ystar-xstar;
 	nodec->dist=mstar-ystar;
       }else{
 	//topology changes
-	printf("\n cas 122\n");
 	
 	if (node1->children[0]==nodeb){
 	  node1->children[1]=nodec;
@@ -226,8 +213,6 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
   }else{
 
     //noded is the other extremity for the local change
-    printf("\ncase 2\n");
-    //printf("\n cas 2\n");
     float m = nodea->dist + node1->dist + node2->dist;
     //m is the distance nodea noded
     *mratio=m;
@@ -239,12 +224,10 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
     if (frand()<0.5){
       // node2  does not move
       //ie node 1 moves      
-      printf("\n cas 21\n");
       xstar=u2*mstar;
       ystar=y*mstar/m;
       
       if (xstar<ystar){
-	printf("\n cas 211\n");
 	//topology does not change
 	nodea->dist=xstar;
 	node1->dist=ystar-xstar;
@@ -264,13 +247,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 	  node1->dist=ystar-xstar;
 	  
 	}else{
-	  //topology changes
-	  printf("\n cas topochanges\n");
-	  printf("\n cas 212\n");
-	  
-	  printf("\nvoicile nomdenoded %d\n",noded->name);
-	  printf("\nvoicile\n");
-	  fflush(stdout);
+	  //topology changes	
 	  
 	  if (node2->children[0]==nodec){
 	    node2->children[1]=nodea;
@@ -304,10 +281,8 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
     }else{
       //node1 does not move
       //ie node 2 moves
-      printf("\n cas 22\n");
       //node2 has to have a parent otherwise it is not possible
-      //so, in case node2 does not have any parent , we perform subtreeslide  again
-      printf("\n cas node1 bouge pas\n");
+      //so, in case node2 does not have any parent , we perform subtreeslide  again 
       if (node2->parent==NULL){
 	performSubtreeSlide(tree,mratio,mstarratio);
       }else{
@@ -317,7 +292,6 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 	xstar=x*mstar/m;
 	
 	if (xstar<ystar){
-	  printf("\n cas 221\n");
 	  //topology does not change
 	  nodea->dist=xstar;
 	  node1->dist=ystar-xstar;
@@ -325,9 +299,7 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 
 	}else{
 	  //topology changes
-	  printf("\n cas 222\n");
-	  printf("\nvoicile nomdenoded %d\n",noded->name);
-	  
+	 
 	  if (node2->children[0]==nodec){
 	    node2->children[1]=nodea;
 	  }else{
@@ -381,7 +353,8 @@ void proposeRandomNni(Tree *tree, Node **a, Node **b)
 
   *mratio=m;
   *mstarratio=mstar;
-  
+
+
 }
 
 

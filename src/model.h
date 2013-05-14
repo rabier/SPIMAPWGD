@@ -124,6 +124,15 @@ public:
       return doomtable;
     }
 
+    double *getdoomrootleft(){
+      return doomrootleft;
+    }
+
+    double *getdoomrootright(){
+      return doomrootright;
+    }
+
+
     float getq(){
       return q;
     }
@@ -141,6 +150,8 @@ protected:
     bool approx;
     bool useBranchPrior;
     double *doomtable;
+    double *doomrootleft;
+    double *doomrootright;
     SeqLikelihood *likelihoodFunc;
     float q;
 

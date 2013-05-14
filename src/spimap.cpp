@@ -6,7 +6,7 @@
     Copyright 2010-2011
 
     modified for WGD by Charles-Elie Rabier
-    2011
+    2011-2013
 
 =============================================================================*/
 
@@ -124,6 +124,9 @@ public:
 	config.add(new ConfigParam<float>
 		   ("-LR", "--lineagesatroot", "<param for lineages at the root>                     ",&q, 0.5,
 		    "parameter for the geometric law, concerning the number of lineages at the root (default=0.5)"));
+	config.add(new ConfigParam<int>
+		    ("-OB","--observingsomething", "<obssmthg>", &observingsomething, 1,
+		    "1 for conditionning on observing something (default: 1) or 2 for at least one on the left and at least one on the right"));
 	config.add(new ConfigParam<float>
 		   ("-P", "--pretime", "<pre-speciation time parameter>", 
 		    &pretime, 1.00,
@@ -269,8 +272,8 @@ public:
     printLog(LOG_LOW, "-duprate %f\n", duprate);
     printLog(LOG_LOW, "-lossrate %f\n", lossrate);  
     printLog(LOG_LOW, "--lineagesatroot %f\n", q);
+    printLog(LOG_LOW, "--observingsomething (1 for observingsomething and 2 for at least one on the left and at least one on the right %d\n", observingsomething);
     printLog(LOG_LOW, "-P %f\n", pretime);
-
     printLog(LOG_LOW, "-niter %d\n", niter);
     printLog(LOG_LOW, "-- quickiter %d\n", quickiter);
     printLog(LOG_LOW, "-b %d\n", bootiter);
@@ -316,7 +319,8 @@ public:
     float lossrate;
     float pretime;
     float q;
-
+    int observingsomething;
+    
     // search
     int niter;
     int quickiter;
@@ -466,8 +470,6 @@ int main(int argc, char **argv)
    
     printf("\nSpecies tree from input file, including WGD nodes:\n");
     displayTree(&stree_noWGD, stdout, 0.2);
-
-    printf("\nInput species tree:\n");
     writeNewickTree(stdout, &stree_noWGD,true);
 
 
@@ -501,16 +503,16 @@ int main(int argc, char **argv)
       }
     }
     
-
+ 
 
     printf("\nthe WGD species tree graphically:\n");
-     writeNewickTree(stdout, WGDstree,true);
+    writeNewickTree(stdout, WGDstree,true);
+
+    displayTree(WGDstree, stdout, 0.2);  
+
 
     printf("\nReduced species tree:\n");
     writeNewickTree(stdout, &stree_noWGD,true);
-
-
-    displayTree(WGDstree, stdout, 0.2);
 
     displayTree(&stree_noWGD, stdout,0.2);
 
@@ -613,7 +615,7 @@ int main(int argc, char **argv)
     printf("\nInitial gene tree from Neighbor-joining:\n");
     fflush(stdout);  
     displayTree(tree);
-    //writeNewickTree(stdout, tree,true);     
+    // writeNewickTree(stdout, tree,true);     
 
     //========================================================
     // determine kappa
@@ -647,8 +649,8 @@ int main(int argc, char **argv)
       extendRateParamToWGDnodes(params,WGDstree);
     } 
 
-    printf("now creating SpimapModel");
     fflush(stdout);
+
     SpimapModel *m = new SpimapModel(nnodes, WGDstree, &stree_noWGD, params,
                                      gene2species,
                                      c.pretime, 
@@ -657,7 +659,8 @@ int main(int argc, char **argv)
                                      c.priorSamples,
                                      !c.priorExact,
                                      true,c.q);
-     printf("done\n");
+    /*
+
      printf("now printing species tree\n");
      fflush(stdout);
 
@@ -670,6 +673,8 @@ int main(int argc, char **argv)
      }
 
      fflush(stdout);
+
+    */
 
      m->setLikelihoodFunc(new HkySeqLikelihood(
         aln->nseqs, aln->seqlen, aln->seqs, 
@@ -724,7 +729,7 @@ int main(int argc, char **argv)
     // here is when the first reconciliation happens
 
     Tree *toptree = search->search(tree, genes, 
-                                   aln->nseqs, aln->seqlen, aln->seqs, c.outprefix, c.method,c.keepTreeSampled,c.keepDupLoss);
+                                   aln->nseqs, aln->seqlen, aln->seqs, c.outprefix, c.method,c.keepTreeSampled,c.keepDupLoss,c.observingsomething);
 
     // return 1;
 
@@ -758,12 +763,14 @@ int main(int argc, char **argv)
     string outtreeFilename = c.outprefix  + ".tree";
     writeNewickTree(outtreeFilename.c_str(), toptree);
 
+    
 
-    /////
+    /////////////////////////////
     printf("now printing species tree\n");
     displayTree(WGDstree, stdout, 0.2);
     fflush(stdout);
 
+    
      for (int i=0; i<WGDstree->nnodes; i++) {
        Node *node = WGDstree->nodes[i];
        printf("%d\t%s\n", node->name,(node->longname).c_str());
@@ -771,36 +778,43 @@ int main(int argc, char **argv)
 	 printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
        }
      }
+    
      /////////////////////////////
-  printf("now printing final gene tree\n");
-  displayTree(toptree, stdout,60,2);
+
+    
+
+     printf("now printing final gene tree\n");
+     displayTree(toptree, stdout,60,2);
   
-  for (int i=0; i<toptree->nnodes; i++) {
-    Node *node = toptree->nodes[i];
-    printf("%d\t%s\n", node->name,(node->longname).c_str());
-    for (int i=0; i<node->nchildren; i++){
-      printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
-    }
-  }
+     
+     for (int i=0; i<toptree->nnodes; i++) {
+       Node *node = toptree->nodes[i];
+       printf("%d\t%s\n", node->name,(node->longname).c_str());
+       for (int i=0; i<node->nchildren; i++){
+	 printf("\t%d\t%s\n", node->children[i]->name, (node->children[i]->longname).c_str());
+       }
+     }
+     
+     
+     ///////////////////////////////
 
 
-    // log tree correctness
-    if (c.correctFile != "") {
-       printf("we areafetr c.correctfile\n");
-        if (proposer->seenCorrect()) {
-            printLog(LOG_LOW, "SEARCH: correct visited\n");
-        } else {
-            printLog(LOG_LOW, "SEARCH: correct NEVER visited\n");
-        }
+     // log tree correctness
+     if (c.correctFile != "") {      
+       if (proposer->seenCorrect()) {
+	 printLog(LOG_LOW, "SEARCH: correct visited\n");
+       } else {
+	 printLog(LOG_LOW, "SEARCH: correct NEVER visited\n");
+       }
         
-        if (toptree->sameTopology(&correctTree)) {
-            printLog(LOG_LOW, "RESULT: correct\n");
-        } else {
-            printLog(LOG_LOW, "RESULT: wrong\n");
-        }
-    }
-   
+       if (toptree->sameTopology(&correctTree)) {
+	 printLog(LOG_LOW, "RESULT: correct\n");
+       } else {
+	 printLog(LOG_LOW, "RESULT: wrong\n");
+       }
+     }
   
+    
     fflush(stdout);
     // log runtime
     time_t runtime = time(NULL) - startTime;
@@ -811,6 +825,9 @@ int main(int argc, char **argv)
     printLog(LOG_LOW, "runtime seconds:\t%d\n", runtime);
     printLog(LOG_LOW, "runtime minutes:\t%.1f\n", float(runtime / 60.0));
     printLog(LOG_LOW, "runtime hours:\t%.1f\n", float(runtime / 3600.0));
+
+
+    
     closeLogFile();
     
 }
