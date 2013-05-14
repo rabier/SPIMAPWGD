@@ -124,7 +124,7 @@ double fullTreeCorrection(Tree *tree, Tree *stree, int *recon)
 //must be the nodes corresponding to theWGD[0]->WGD_at 
 
 void calcDoomTable(Tree *WGDstree, float birthRate, float deathRate, 
-                   double *doomtable)
+                   double *doomtable, double *doomrootleft, double *doomrootright)
 {
     const double l = birthRate;
     const double u = deathRate;
@@ -187,14 +187,27 @@ void calcDoomTable(Tree *WGDstree, float birthRate, float deathRate,
 	      p1 = r*r * ert / luert / luert;
 	    }
 	    
+
+	    if (child->name==WGDstree->root->children[0]->name){
+	      *doomrootleft= log(p0 + dc * p1 / (1.0 - lu * p0 * dc));
+	    }
+	    
+
+	    if (child->name==WGDstree->root->children[1]->name){
+	      *doomrootright= log(p0 + dc * p1 / (1.0 - lu * p0 * dc));
+	    }
+
 	    prod += log(p0 + dc * p1 / (1.0 - lu * p0 * dc));
+
 	  }
 	  
 	}
+
 	doomtable[node->name] = prod ;
 
       }
     }
+    
 }
 
 

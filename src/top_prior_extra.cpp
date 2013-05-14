@@ -447,9 +447,7 @@ void getHashIds(Tree *tree, int *recon, int *hashids)
         delete keylist[i];
     }
 
-    //printf("hashids = ");
-    //printIntArray(hashids, tree->nnodes);
-    //printf("\n");
+
 }
 
 
@@ -470,20 +468,18 @@ double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon,
   ExtendArray<Node*> subleaves(0, tree->nnodes);   
   ExtendArray<int> hashids(tree->nnodes);
   getHashIds(tree, recon, hashids);
-  double nhist, thist;
+  double nhist, thist, WGDlabel;
   
-  //const float q=0.5;//it means that in mean we have 2 genes at the root
+  //we recall that fro instance  q=0.5 means that  we have 2 genes on average  at the root
 
   ///DEAL with with branches above the species tree root
 
   // preroot duplications
 
   if (events[tree->root->name] == EVENT_SPEC){
+    //we observe only one lineage at the root
     subleaves.clear();
-    const double dc = exp(doomtable[stree->root->name]);
-   
-    // printf("\nvoici  ledoom racine %f\n",exp(doomtable[stree->root->name]));    
-    //    prob+= log(q) -2*log(1-q) -2*dc;
+    const double dc = exp(doomtable[stree->root->name]); 
 
     prob+= log(q) -2*log(1-(1-q)*dc);
 
@@ -503,15 +499,11 @@ double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon,
     nhist *= exp(numRedundantTopologies(tree, tree->root, 
 					subleaves, 
 					hashids,
-					false));
+					true));
       
     prob += log(nhist) - log(thist);
-    // prob -= log(100);
-    //improper prior on the number of subleaves at the root     
+     
 
-    //printf("\nvoici  ledoom racine %f\n",exp(doomtable[stree->root->name]));    
-   
-    //    prob+= log(q) -2*log(1-q) -(subleaves.size()+1)*log(dc);
     prob+= log(q) + (subleaves.size()-1)*log(1-q) -(subleaves.size()+1)*log(1-(1-q)*dc);
 
   }
@@ -549,11 +541,20 @@ double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon,
 	const int s = subleaves.size();
 	
 	if (s==2){
-	  prob += log(1-stree->theWGD[indWGD]->lossProb);
+	
+	  WGDlabel=exp(numRedundantTopologies(tree, node, 
+				     subleaves, 
+				     hashids,
+				     true));
+
+	  prob += log((1-stree->theWGD[indWGD]->lossProb)*WGDlabel);
+
 	}else{
-	  prob += log(stree->theWGD[indWGD]->lossProb+(1-stree->theWGD[indWGD]->lossProb)*dc);
+	  
+	  prob += log(stree->theWGD[indWGD]->lossProb+(1-stree->theWGD[indWGD]->lossProb)*dc*2);
+
 	}
-	//note no corrections factors needed for WGD
+	
 
       }else{
 	//snode is not a WGD_before 
@@ -576,13 +577,13 @@ double birthDeathTreePrior2(Tree *tree, Tree *stree, int *recon,
 	      nhist *= exp(numRedundantTopologies(tree, node, 
 						  subleaves, 
 						  hashids,
-						  true));
+						  false));
 	    } else {
 	      // correct subtrees that do not have leaves
 	      nhist *= exp(numRedundantTopologies(tree, node, 
 						    subleaves, 
 						    hashids,
-						    false));
+						    true));
 	    }
 	  }
 		

@@ -17,7 +17,7 @@ namespace spidir {
 
 extern "C" {
 
-void calcDoomTable(Tree *tree, float birth, float death, double *doomtable);
+void calcDoomTable(Tree *tree, float birth, float death, double *doomtable, double *doomrootleft, double *doomrootright);
 
 void getSpecSubtree(Node *node, Node *snode, int *recon, int *events,
                     ExtendArray<Node*> &nodes);
