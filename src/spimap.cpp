@@ -122,8 +122,8 @@ public:
 		    &lossrate, 0.1,
 		    "probability of loss (default=0.1)"));
 	config.add(new ConfigParam<float>
-		   ("-LR", "--lineagesatroot", "<param for lineages at the root>                     ",&q, 0.5,
-		    "parameter for the geometric law, concerning the number of lineages at the root (default=0.5)"));
+		   ("-LR", "--lineagesatroot", "<param for lineages at the root>                     ",&q, 0.95,
+		    "parameter for the geometric law, concerning the number of lineages at the root (default=0.95)"));
 	config.add(new ConfigParam<int>
 		    ("-OB","--observingsomething", "<obssmthg>", &observingsomething, 1,
 		    "1 for conditionning on observing something (default: 1) or 2 for at least one on the left and at least one on the right"));
@@ -148,12 +148,12 @@ public:
 		    "number of bootstraps to perform (default: 1)"));
         config.add(new ConfigParam<int>
 		   ("-g", "--proposal-gene-topology", "<proposal type for gene tree topology>", 
-		    &propid, 1,
-		    "1 for spr-neighbor (default: 1), 0 for nni, 2 for SubtreeSlide"));
+		    &propid, 2,
+		    "1 for spr-neighbor, 0 for nni, 2 for SubtreeSlide (default: 2) "));
 	 config.add(new ConfigParam<int>
 		    ("","--mcmc", "<mcmc>", 
 		    &method, 1,
-		    "1 for MCMC (default: 1) or 0 for MAP"));
+		    "1 for MCMC or 0 for MAP  (default: 0)"));
     
         // misc
 	config.add(new ConfigParamComment("Miscellaneous", DEBUG_OPT));
