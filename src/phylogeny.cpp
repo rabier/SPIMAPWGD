@@ -406,9 +406,50 @@ void writeRecon(FILE *out, Tree *tree, SpeciesTree *stree,
 
     for (int i=0; i<tree->nnodes; i++) {
         Node *node = tree->nodes[i];
-        fprintf(out, "%s\t%s\t%s\n", node->longname.c_str(), 
+
+	if (stree->nodes[recon[i]]->longname=="WGD_at") {
+
+	  //  fprintf(out, "%s\t%s\t%s\n", node->longname.c_str(), 
+	  //    stree->nodes[recon[i]]->longname.c_str(), 
+	  //    "WGD");
+
+	  /*
+	    OLDER VERSION Which gives the WGD number in a fourth column
+	  for (int k=0; k<stree->nWGD; k++){
+	    //find which WGD
+	    if (stree->nodes[recon[i]]==stree->theWGD[k]->WGD_at) {	    	      
+	      fprintf(out, "%s\t%s\t%s\t%d\n", node->longname.c_str(), 
+                "WGD_at", "WGD",k);
+	    }
+	  }
+	  */
+
+	  char WGDnumber[10];
+
+	  for (int k=0; k<stree->nWGD; k++){
+	    //find which WGD
+	    if (stree->nodes[recon[i]]==stree->theWGD[k]->WGD_at) {	
+	     
+	      //in order to specify in the .recon file, which WGD we are talking about
+	      //we merge WGD_at and the number associated to the WGD
+	      snprintf(WGDnumber, 20, "WGD_at%d", k);
+    	      
+	      fprintf(out, "%s\t%s\t%s\n", node->longname.c_str(), 
+		      string(WGDnumber).c_str(), "WGD");
+	    }
+	  }
+
+ 
+
+	} else {
+
+	  fprintf(out, "%s\t%s\t%s\n", node->longname.c_str(), 
                 stree->nodes[recon[i]]->longname.c_str(), 
                 eventstr[events[i]]);
+
+	}
+
+       
     }
 }
 

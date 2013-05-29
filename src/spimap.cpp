@@ -152,7 +152,7 @@ public:
 		    "1 for spr-neighbor, 0 for nni, 2 for SubtreeSlide (default: 2) "));
 	 config.add(new ConfigParam<int>
 		    ("","--mcmc", "<mcmc>", 
-		    &method, 1,
+		    &method, 0,
 		    "1 for MCMC or 0 for MAP  (default: 0)"));
     
         // misc
@@ -260,7 +260,7 @@ public:
   {
 
     printLog(LOG_LOW, "SPIMAP executed with the following parameters\n");
-    printLog(LOG_LOW, "-propGT (0 for NNI and 1 for SPR) %d\n", propid);
+    printLog(LOG_LOW, "-propGT (0 for NNI, 1 for SPR, 2 for SubtreeSlide) %d\n", propid);
     printLog(LOG_LOW, "-a %s\n", alignfile.c_str());
     printLog(LOG_LOW, "-S %s\n", smapfile.c_str());
     printLog(LOG_LOW, "-s %s\n", streefile.c_str());
@@ -272,7 +272,7 @@ public:
     printLog(LOG_LOW, "-duprate %f\n", duprate);
     printLog(LOG_LOW, "-lossrate %f\n", lossrate);  
     printLog(LOG_LOW, "--lineagesatroot %f\n", q);
-    printLog(LOG_LOW, "--observingsomething (1 for observingsomething and 2 for at least one on the left and at least one on the right %d\n", observingsomething);
+    printLog(LOG_LOW, "--observingsomething (1 for observingsomething and 2 for at least one on the left and at least one on the right) %d\n", observingsomething);
     printLog(LOG_LOW, "-P %f\n", pretime);
     printLog(LOG_LOW, "-niter %d\n", niter);
     printLog(LOG_LOW, "-- quickiter %d\n", quickiter);
@@ -484,12 +484,12 @@ int main(int argc, char **argv)
        printf("\tloss probability:  %f\n",wgd->lossProb);
        printf("\tpercent distance:  %f\n",wgd->percentDist);
        printf("\ttotal distance:    %f\n",wgd->totalDist);
-       printf("\tnode name at the end of 'before' period: %d\n",
+       printf("\tnode number at the end of 'before' period: %d\n",
 	      wgd->WGD_before->name);
        printf("\tdistance 'before': %f\n", wgd->WGD_before->dist);
-       printf("\tnode name at the end of 'at' period:     %d\n",
+       printf("\tnode number at the end of 'at' period:     %d\n",
 	      wgd->WGD_at->name);
-       printf("\tnode name at the end of 'after' period:  %d\n",
+       printf("\tnode number at the end of 'after' period:  %d\n",
 	      wgd->WGD_after->name);
        printf("\tdistance 'after':  %f\n", wgd->WGD_after->dist);
     }
@@ -797,7 +797,7 @@ int main(int argc, char **argv)
      
      
      ///////////////////////////////
-
+     
 
      // log tree correctness
      if (c.correctFile != "") {      
@@ -826,9 +826,9 @@ int main(int argc, char **argv)
     printLog(LOG_LOW, "runtime minutes:\t%.1f\n", float(runtime / 60.0));
     printLog(LOG_LOW, "runtime hours:\t%.1f\n", float(runtime / 3600.0));
 
-
+     
     
     closeLogFile();
-    
+     
 }
 

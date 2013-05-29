@@ -2,7 +2,7 @@
 # SPIMAP (SPecies Informed Max A Posteriori gene tree reconstruction)
 # Matt Rasmussen
 # Copyright 2007-2011
-#
+# modified for WGD by Charles Elie Rabier
 # Makefile
 #
 

@@ -2,6 +2,10 @@ SPIMAP (Spieces informed max a poseriori)
 http://compbio.mit.edu/spimap/
 Matthew Rasmussen
 
+modified for WGD by Charles-Elie Rabier 
+SPIMAPWGD is a version of SPIMAP which incorporates Whole Genome Duplications (WGD) events.
+
+
 =============================================================================
 ABOUT
 
@@ -59,11 +63,11 @@ installed.
 =============================================================================
 USAGE
 
-Running spimap with no arguments will print out its command-line usage:
+Running SPIMAPWGD with no arguments will print out its command-line usage:
 
 Usage: spimap [OPTION]
 
-  -a,--align  <alignment fasta>
+-a,--align  <alignment fasta>
     sequence alignment in fasta format
 
   -S,--smap  <species map>
@@ -77,6 +81,9 @@ Usage: spimap [OPTION]
 
   -o,--output  <output filename prefix>
     prefix for all output filenames
+
+  -r,--recon  
+    Output reconciliation
 
 Sequence evolution model
   -k,--kappa  <transition/transversion ratio>
@@ -92,6 +99,12 @@ Dup/loss evolution model
   -L,--lossrate  <loss rate>
     probability of loss (default=0.1)
 
+ -LR,--lineagesatroot  <param for lineages at the root>                     
+    parameter for the geometric law, concerning the number of lineages at the root (default=0.95)
+
+  -OB,--observingsomething  <obssmthg>
+    1 for conditionning on observing something (default: 1) or 2 for at least one on the left and at least one on the right
+
   -P,--pretime  <pre-speciation time parameter>
     lambda param of pre-speciation distribution (default=1.0)
 
@@ -105,6 +118,12 @@ Search
   -b,--boot  <# bootstraps>
     number of bootstraps to perform (default: 1)
 
+  -g,--proposal-gene-topology  <proposal type for gene tree topology>
+    1 for spr-neighbor, 0 for nni, 2 for SubtreeSlide (default: 2) 
+
+  --mcmc  <mcmc>
+    1 for MCMC or 0 for MAP  (default: 0)
+
 Information
   -V,--verbose  <verbosity level>
     verbosity level 0=quiet, 1=low, 2=medium, 3=high
@@ -112,7 +131,13 @@ Information
   --log  <log filename>
     log filename.  Use '-' to display on stdout.
 
-  -v,--version  
+  --treeSampled  
+    Output treeSampled
+
+  --informationduploss  
+    Output losses, losses at WGD, duplications, duplications at WGD
+
+ -v,--version  
     display version information
 
   -h,--help  
@@ -122,9 +147,9 @@ Information
     display help information about debug options
 
 
+
 #=============================================================================
 # Examples
 
-See examples/analyze-fungi.sh for an example of how to use each program
-in the SPIMAP package.
+see the examples on the website in order to learn how to run SPIMAPWGD
 
