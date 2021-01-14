@@ -1,13 +1,16 @@
-SPIMAP (Spieces informed max a poseriori)
+SPIMAPWGD by Charles-Elie Rabier 
+It is a version of SPIMAP which incorporates Whole Genome Duplications (WGD) events.
+
+SPIMAPWGD citation:
+Rabier C-E, Ta T., Ane C. : Detecting and locating Whole Genome Duplications on a phylogeny: a probabilistic approach (Molecular Biology and Evolution, 2014, doi:10.1093/molbev/mst263)
+
+
+SPIMAP (Species informed max a poseriori)
 http://compbio.mit.edu/spimap/
-Matthew Rasmussen
-
-modified for WGD by Charles-Elie Rabier 
-SPIMAPWGD is a version of SPIMAP which incorporates Whole Genome Duplications (WGD) events.
-
+Matthew Rasmussen 
 
 =============================================================================
-ABOUT
+ABOUT SPIMAP
 
 SPIMAP is a phylogenetic program that uses a species tree to aide in
 reconstructing gene trees.  It uses code from the SPIDIR phylogenetic library.
